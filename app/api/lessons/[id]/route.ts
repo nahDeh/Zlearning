@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+function parseJsonField<T>(field: string | null, defaultValue: T): T {
+  if (!field) return defaultValue;
+  try {
+    return JSON.parse(field) as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -35,10 +44,10 @@ export async function GET(
       outlineId: lesson.outlineId,
       title: lesson.title,
       orderIndex: lesson.orderIndex,
-      objective: lesson.objective,
-      prerequisites: lesson.prerequisites,
+      objective: parseJsonField<string[]>(lesson.objective, []),
+      prerequisites: parseJsonField<string[]>(lesson.prerequisites, []),
       content: lesson.content,
-      examples: lesson.examples,
+      examples: parseJsonField<Array<{ title: string; code?: string; explanation: string }>>(lesson.examples, []),
       summary: lesson.summary,
       estimatedMinutes: lesson.estimatedMinutes,
       outline: {

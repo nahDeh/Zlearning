@@ -22,6 +22,7 @@ import {
   User,
   ArrowLeft,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 const levelLabels: Record<string, string> = {
@@ -87,82 +88,87 @@ export default function ConfirmPage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">加载中...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/20">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-cyan-200/50">
+            <Loader2 className="h-6 w-6 animate-spin text-white" />
+          </div>
+          <p className="text-slate-600 font-medium">加载中...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <CheckCircle2 className="h-8 w-8 text-primary" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/20">
+      <Card className="w-full max-w-2xl glass rounded-3xl shadow-xl border-0">
+        <CardHeader className="text-center pb-6">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-200/50">
+            <CheckCircle2 className="h-8 w-8 text-white" />
           </div>
-          <CardTitle className="text-2xl">你的学习画像已生成</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl text-slate-800">你的学习画像已生成</CardTitle>
+          <CardDescription className="text-slate-500 mt-2">
             请确认以下信息是否准确，我们将据此为你定制学习计划
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-              <BookOpen className="h-5 w-5 text-primary mt-0.5" />
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-cyan-50/50 border border-cyan-100">
+              <BookOpen className="h-5 w-5 text-cyan-600 mt-0.5" />
               <div>
-                <p className="text-sm text-muted-foreground">学习主题</p>
-                <p className="font-medium">{profile.topic}</p>
+                <p className="text-sm text-slate-500">学习主题</p>
+                <p className="font-medium text-slate-800">{profile.topic}</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-              <Target className="h-5 w-5 text-primary mt-0.5" />
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-cyan-50/50 border border-cyan-100">
+              <Target className="h-5 w-5 text-cyan-600 mt-0.5" />
               <div>
-                <p className="text-sm text-muted-foreground">学习目标</p>
-                <p className="font-medium line-clamp-2">{profile.goal}</p>
+                <p className="text-sm text-slate-500">学习目标</p>
+                <p className="font-medium text-slate-800 line-clamp-2">{profile.goal}</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-              <User className="h-5 w-5 text-primary mt-0.5" />
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-cyan-50/50 border border-cyan-100">
+              <User className="h-5 w-5 text-cyan-600 mt-0.5" />
               <div>
-                <p className="text-sm text-muted-foreground">当前水平</p>
-                <Badge variant="secondary">{levelLabels[profile.currentLevel]}</Badge>
+                <p className="text-sm text-slate-500">当前水平</p>
+                <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100 border-0">{levelLabels[profile.currentLevel]}</Badge>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-              <Clock className="h-5 w-5 text-primary mt-0.5" />
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-cyan-50/50 border border-cyan-100">
+              <Clock className="h-5 w-5 text-cyan-600 mt-0.5" />
               <div>
-                <p className="text-sm text-muted-foreground">每周学习时间</p>
-                <p className="font-medium">约 {profile.timeBudget} 小时</p>
+                <p className="text-sm text-slate-500">每周学习时间</p>
+                <p className="font-medium text-slate-800">约 {profile.timeBudget} 小时</p>
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-lg bg-muted/50">
+          <div className="p-4 rounded-xl bg-cyan-50/50 border border-cyan-100">
             <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-primary mt-0.5" />
+              <Lightbulb className="h-5 w-5 text-cyan-600 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-2">学习风格</p>
-                <Badge variant="outline">{styleLabels[profile.learningStyle]}</Badge>
+                <p className="text-sm text-slate-500 mb-2">学习风格</p>
+                <Badge variant="outline" className="border-cyan-300 text-cyan-700">{styleLabels[profile.learningStyle]}</Badge>
               </div>
             </div>
           </div>
 
           {profile.background && (
-            <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-1">背景信息</p>
-              <p className="text-sm">{profile.background}</p>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-sm text-slate-500 mb-1">背景信息</p>
+              <p className="text-sm text-slate-700">{profile.background}</p>
             </div>
           )}
 
           {profile.preferences && profile.preferences.length > 0 && (
-            <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-2">学习偏好</p>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-sm text-slate-500 mb-2">学习偏好</p>
               <div className="flex flex-wrap gap-2">
                 {profile.preferences.map((pref, index) => (
-                  <Badge key={index} variant="secondary">
+                  <Badge key={index} className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100 border-0">
                     {pref}
                   </Badge>
                 ))}
@@ -170,12 +176,16 @@ export default function ConfirmPage() {
             </div>
           )}
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button variant="ghost" onClick={handleEdit}>
+        <CardFooter className="flex justify-between pt-6">
+          <Button variant="ghost" onClick={handleEdit} className="text-slate-600 hover:text-slate-800 hover:bg-slate-100">
             <ArrowLeft className="mr-2 h-4 w-4" />
             重新填写
           </Button>
-          <Button onClick={handleConfirm} disabled={isSaving}>
+          <Button 
+            onClick={handleConfirm} 
+            disabled={isSaving}
+            className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-full px-6 shadow-lg shadow-cyan-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-200/40 hover:-translate-y-0.5"
+          >
             {isSaving ? "保存中..." : "确认并开始学习"}
             {!isSaving && <ArrowRight className="ml-2 h-4 w-4" />}
           </Button>

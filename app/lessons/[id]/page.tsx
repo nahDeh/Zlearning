@@ -3,10 +3,20 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LessonContent } from "@/components/lesson/LessonContent";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Settings, 
+  Moon, 
+  Maximize2,
+  MessageCircle,
+  CheckCircle,
+  Edit3,
+  Loader2,
+  BookOpen,
+  Sparkles
+} from "lucide-react";
 
 interface LessonData {
   id: string;
@@ -36,24 +46,11 @@ async function getLessonData(lessonId: string): Promise<LessonData | null> {
   return res.json();
 }
 
-async function regenerateLesson(lessonId: string): Promise<{ success: boolean; lesson?: LessonData; error?: string }> {
-  try {
-    const res = await fetch(`/api/lessons/${lessonId}/generate`, {
-      method: "POST",
-    });
-    const data = await res.json();
-    return data;
-  } catch {
-    return { success: false, error: "重新生成失败" };
-  }
-}
-
 export default function LessonPage({ params }: PageProps) {
   const { id } = use(params);
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState("简介");
 
   useEffect(() => {
     async function fetchData() {
@@ -61,7 +58,7 @@ export default function LessonPage({ params }: PageProps) {
         const data = await getLessonData(id);
         setLesson(data);
       } catch {
-        setError("加载章节失败");
+        console.error("加载章节失败");
       } finally {
         setLoading(false);
       }
@@ -69,29 +66,14 @@ export default function LessonPage({ params }: PageProps) {
     fetchData();
   }, [id]);
 
-  const handleRegenerate = async () => {
-    if (!lesson) return;
-    setRegenerating(true);
-    setError(null);
-    try {
-      const result = await regenerateLesson(lesson.id);
-      if (result.success && result.lesson) {
-        setLesson(result.lesson);
-      } else {
-        setError(result.error || "重新生成失败");
-      }
-    } catch {
-      setError("重新生成失败");
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-lg text-muted-foreground">加载中...</div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+          </div>
+          <p className="text-slate-400">加载中...</p>
         </div>
       </div>
     );
@@ -99,9 +81,13 @@ export default function LessonPage({ params }: PageProps) {
 
   if (!lesson) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-lg text-muted-foreground">章节不存在</div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-8 h-8 text-slate-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-300 mb-2">章节不存在</h3>
+          <p className="text-slate-500">该章节可能已被删除或您没有访问权限</p>
         </div>
       </div>
     );
@@ -112,83 +98,232 @@ export default function LessonPage({ params }: PageProps) {
   const prevLesson = currentIndex > 0 ? allLessons[currentIndex - 1] : null;
   const nextLesson = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
 
+  // 目录结构
+  const tocItems = [
+    { id: "intro", title: "简介" },
+    { id: "event-loop", title: "事件循环" },
+    { id: "coroutine", title: "协程" },
+    { id: "practice", title: "实战练习" },
+  ];
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <Link
-          href={`/courses/${lesson.outlineId}`}
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1 mb-4"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          返回课程列表
-        </Link>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-            {lesson.orderIndex}
+    <div className="min-h-screen bg-slate-900 text-slate-200">
+      {/* 顶部导航栏 */}
+      <header className="glass-dark border-b border-slate-700/50 px-4 py-3 sticky top-0 z-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/learn" className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+              <span className="text-sm font-medium">返回</span>
+            </Link>
+            <div className="h-6 w-px bg-slate-700" />
+            <h1 className="text-sm font-medium text-slate-200">
+              第 {lesson.orderIndex} 章：{lesson.title}
+            </h1>
           </div>
-          <h1 className="text-2xl font-bold">{lesson.title}</h1>
+          <div className="flex items-center gap-2">
+            <button className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800/50 rounded-lg transition-colors">
+              <Settings className="w-5 h-5" />
+            </button>
+            <button className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800/50 rounded-lg transition-colors">
+              <Moon className="w-5 h-5" />
+            </button>
+            <button className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800/50 rounded-lg transition-colors">
+              <Maximize2 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {error && (
-        <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-lg">
-          {error}
-        </div>
-      )}
+      <div className="flex">
+        {/* 左侧目录 */}
+        <aside className="w-72 glass-dark border-r border-slate-700/50 min-h-[calc(100vh-60px)] p-5">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-cyan-400" />
+              目录
+            </h2>
+            <nav className="space-y-1">
+              {tocItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.title)}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all ${
+                    activeSection === item.title
+                      ? "bg-gradient-to-r from-cyan-500/20 to-cyan-600/10 text-cyan-400 border border-cyan-500/30"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                  }`}
+                >
+                  {item.title}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-      <LessonContent
-        objective={lesson.objective || []}
-        prerequisites={lesson.prerequisites || []}
-        content={lesson.content || ""}
-        examples={lesson.examples || []}
-        summary={lesson.summary || ""}
-        estimatedMinutes={lesson.estimatedMinutes}
-        onRegenerate={handleRegenerate}
-        isRegenerating={regenerating}
-      />
+          {/* AI 教练按钮 */}
+          <button className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-xl text-cyan-400 hover:from-cyan-500/30 hover:to-blue-500/30 transition-all group">
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="text-left">
+              <span className="text-sm font-medium block">AI 教练</span>
+              <span className="text-xs text-cyan-400/70">随时为你解答</span>
+            </div>
+          </button>
+        </aside>
 
-      <div className="mt-8 flex items-center justify-between">
-        {prevLesson ? (
-          <Link href={`/lessons/${prevLesson.id}`}>
-            <Button variant="outline">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              上一节：{prevLesson.title}
-            </Button>
-          </Link>
-        ) : (
-          <div />
-        )}
-        {nextLesson ? (
-          <Link href={`/lessons/${nextLesson.id}`}>
-            <Button>
-              下一节：{nextLesson.title}
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </Link>
-        ) : (
-          <div />
-        )}
-      </div>
+        {/* 主内容区 */}
+        <main className="flex-1 p-8 max-w-4xl">
+          {/* 章节标题 */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <span className="text-xl">🚀</span>
+              </div>
+              <h1 className="text-2xl font-bold text-white">
+                {lesson.title}
+              </h1>
+            </div>
+            {lesson.objective && lesson.objective.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {lesson.objective.map((obj, idx) => (
+                  <span key={idx} className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-sm border border-cyan-500/20">
+                    {obj}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="text-lg">课程进度</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
+          {/* 代码示例 */}
+          <div className="bg-slate-800 rounded-xl overflow-hidden mb-8 border border-slate-700">
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                </div>
+                <span className="text-xs text-slate-400 ml-2">python</span>
+              </div>
+              <button className="text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+                复制代码
+              </button>
+            </div>
+            <pre className="p-4 text-sm font-mono text-slate-300 overflow-x-auto leading-relaxed">
+              <code>{`import asyncio
+
+async def main():
+    await asyncio.sleep(1)
+    print("Done")
+
+...
+
+asyncio.run(main())`}</code>
+            </pre>
+          </div>
+
+          {/* 实际课程内容 */}
+          {lesson.content && (
+            <div className="prose prose-invert max-w-none mb-8">
+              <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+            </div>
+          )}
+
+          {/* 示例列表 */}
+          {lesson.examples && lesson.examples.length > 0 && (
+            <div className="space-y-6 mb-8">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <span className="text-cyan-400 text-sm">&lt;/&gt;</span>
+                </div>
+                代码示例
+              </h3>
+              {lesson.examples.map((example, index) => (
+                <div key={index} className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                  <h4 className="text-lg font-medium text-cyan-400 mb-3">{example.title}</h4>
+                  {example.code && (
+                    <pre className="bg-slate-900 rounded-lg p-4 text-sm font-mono text-slate-300 overflow-x-auto mb-3 border border-slate-700">
+                      <code>{example.code}</code>
+                    </pre>
+                  )}
+                  <p className="text-slate-400 text-sm">{example.explanation}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 总结 */}
+          {lesson.summary && (
+            <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-xl p-6 mb-8 border border-cyan-500/20">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-cyan-400" />
+                本章总结
+              </h3>
+              <p className="text-slate-300 leading-relaxed">{lesson.summary}</p>
+            </div>
+          )}
+
+          {/* 底部操作栏 */}
+          <div className="flex items-center justify-between pt-6 border-t border-slate-700/50">
+            <div className="flex gap-3">
+              <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 rounded-xl">
+                <Edit3 className="w-4 h-4 mr-2" />
+                记录笔记
+              </Button>
+              <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl shadow-lg shadow-green-500/20">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                我已掌握
+              </Button>
+            </div>
+
+            <div className="flex gap-3">
+              {prevLesson && (
+                <Link href={`/lessons/${prevLesson.id}`}>
+                  <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 rounded-xl">
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    上一节
+                  </Button>
+                </Link>
+              )}
+              {nextLesson && (
+                <Link href={`/lessons/${nextLesson.id}`}>
+                  <Button className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-xl shadow-lg shadow-cyan-500/20">
+                    下一节
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </main>
+
+        {/* 右侧课程进度 */}
+        <aside className="w-72 glass-dark border-l border-slate-700/50 min-h-[calc(100vh-60px)] p-5">
+          <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center">
+              <span className="text-cyan-400 text-xs">#</span>
+            </div>
+            课程进度
+          </h3>
+          <div className="space-y-1">
             {allLessons.map((l, index) => (
               <Link key={l.id} href={`/lessons/${l.id}`}>
-                <Badge
-                  variant={l.id === lesson.id ? "default" : "outline"}
-                  className="cursor-pointer"
+                <div
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
+                    l.id === lesson.id
+                      ? "bg-gradient-to-r from-cyan-500/20 to-cyan-600/10 text-cyan-400 border border-cyan-500/30"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                  }`}
                 >
-                  {index + 1}. {l.title}
-                </Badge>
+                  <span className={`text-xs w-5 ${l.id === lesson.id ? 'text-cyan-400' : 'text-slate-500'}`}>{index + 1}</span>
+                  <span className="line-clamp-1">{l.title}</span>
+                </div>
               </Link>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </aside>
+      </div>
     </div>
   );
 }

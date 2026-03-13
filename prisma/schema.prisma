@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
@@ -43,11 +43,11 @@ model LearningProfile {
   id            String   @id @default(cuid())
   projectId     String   @unique
   topic         String
-  goal          String   @db.Text
+  goal          String
   currentLevel  String
   timeBudget    Int
   learningStyle String?
-  preferences   Json?
+  preferences   String?
   createdAt     DateTime @default(now())
 
   project LearningProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -63,8 +63,8 @@ model Material {
   filePath      String
   fileSize      Int
   parseStatus   String   @default("pending")
-  extractedText String?  @db.Text
-  metadata      Json?
+  extractedText String?
+  metadata      String?
   createdAt     DateTime @default(now())
 
   project LearningProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -77,10 +77,10 @@ model Material {
 model MaterialChunk {
   id         String   @id @default(cuid())
   materialId String
-  chunkText  String   @db.Text
+  chunkText  String
   chunkIndex Int
   embedding  String?
-  metadata   Json?
+  metadata   String?
   createdAt  DateTime @default(now())
 
   material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
@@ -93,7 +93,7 @@ model Outline {
   id        String   @id @default(cuid())
   projectId String
   version   Int      @default(1)
-  content   Json
+  content   String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -109,11 +109,11 @@ model Lesson {
   outlineId        String
   title            String
   orderIndex       Int
-  objective        String[]
-  prerequisites    String[]
-  content          String?  @db.Text
-  examples         Json?
-  summary          String?  @db.Text
+  objective        String
+  prerequisites    String
+  content          String?
+  examples         String?
+  summary          String?
   estimatedMinutes Int?
   createdAt        DateTime @default(now())
 
@@ -129,10 +129,10 @@ model Exercise {
   id            String   @id @default(cuid())
   lessonId      String
   type          String
-  question      String   @db.Text
-  options       Json?
-  correctAnswer String   @db.Text
-  explanation   String?  @db.Text
+  question      String
+  options       String?
+  correctAnswer String
+  explanation   String?
   difficulty    String?
   createdAt     DateTime @default(now())
 
@@ -165,9 +165,9 @@ model ExerciseAttempt {
   id          String   @id @default(cuid())
   userId      String
   exerciseId  String
-  userAnswer  String   @db.Text
+  userAnswer  String
   isCorrect   Boolean
-  feedback    String?  @db.Text
+  feedback    String?
   attemptedAt DateTime @default(now())
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OutlineChapter, Difficulty } from "@/types/outline";
-import { Prisma } from "@prisma/client";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
+const AI_API_KEY = process.env.AI_API_KEY;
+const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 function isMockMode(): boolean {
-  return !OPENAI_API_KEY || OPENAI_API_KEY === "";
+  return !AI_API_KEY || AI_API_KEY === "";
 }
 
-function parseOutlineContent(content: unknown): OutlineChapter[] {
-  return content as unknown as OutlineChapter[];
+function parseOutlineContent(content: string): OutlineChapter[] {
+  try {
+    return JSON.parse(content) as OutlineChapter[];
+  } catch {
+    return [];
+  }
 }
 
 async function generateOutlineWithAI(
@@ -59,14 +63,14 @@ ${extractedText.slice(0, 4000)}
 只返回 JSON 数组，不要包含任何其他文字。`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AI_MODEL,
         messages: [
           {
             role: "system",
@@ -80,7 +84,7 @@ ${extractedText.slice(0, 4000)}
     });
 
     if (!response.ok) {
-      console.error("OpenAI API error:", response.status);
+      console.error("AI API error:", response.status);
       return generateMockOutline();
     }
 
@@ -218,7 +222,7 @@ export async function POST(
       data: {
         projectId: material.projectId,
         version: newVersion,
-        content: chapters as unknown as Prisma.InputJsonValue,
+        content: JSON.stringify(chapters),
         isActive: true,
       },
     });

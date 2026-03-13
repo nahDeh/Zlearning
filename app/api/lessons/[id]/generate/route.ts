@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
+const AI_API_KEY = process.env.AI_API_KEY;
+const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 interface LessonContent {
   objective: string[];
@@ -13,8 +14,25 @@ interface LessonContent {
   estimatedMinutes: number;
 }
 
+interface OutlineChapter {
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+  difficulty: string;
+  orderIndex: number;
+}
+
 function isMockMode(): boolean {
-  return !OPENAI_API_KEY || OPENAI_API_KEY === "";
+  return !AI_API_KEY || AI_API_KEY === "";
+}
+
+function parseJsonField<T>(field: string | null, defaultValue: T): T {
+  if (!field) return defaultValue;
+  try {
+    return JSON.parse(field) as T;
+  } catch {
+    return defaultValue;
+  }
 }
 
 async function regenerateLessonContent(
@@ -40,13 +58,7 @@ async function regenerateLessonContent(
   }
 
   const outline = lesson.outline;
-  const chapters = outline.content as Array<{
-    title: string;
-    description: string;
-    estimatedMinutes: number;
-    difficulty: string;
-    orderIndex: number;
-  }>;
+  const chapters = parseJsonField<OutlineChapter[]>(outline.content, []);
 
   const chapterInfo = chapters.find((c) => c.orderIndex === lesson.orderIndex);
 
@@ -91,14 +103,14 @@ async function regenerateLessonContent(
 }`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AI_MODEL,
         messages: [
           {
             role: "system",
@@ -113,7 +125,7 @@ async function regenerateLessonContent(
     });
 
     if (!response.ok) {
-      console.error("OpenAI API error:", response.status);
+      console.error("AI API error:", response.status);
       return generateMockLessonContent(lesson.title, chapterInfo.description);
     }
 
@@ -197,10 +209,10 @@ export async function POST(
     const updatedLesson = await prisma.lesson.update({
       where: { id },
       data: {
-        objective: lessonContent.objective,
-        prerequisites: lessonContent.prerequisites,
+        objective: JSON.stringify(lessonContent.objective),
+        prerequisites: JSON.stringify(lessonContent.prerequisites),
         content: lessonContent.content,
-        examples: lessonContent.examples,
+        examples: JSON.stringify(lessonContent.examples),
         summary: lessonContent.summary,
         estimatedMinutes: lessonContent.estimatedMinutes,
       },
@@ -208,7 +220,13 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      lesson: updatedLesson,
+      lesson: {
+        id: updatedLesson.id,
+        title: updatedLesson.title,
+        objective: parseJsonField<string[]>(updatedLesson.objective, []),
+        content: updatedLesson.content,
+        summary: updatedLesson.summary,
+      },
     });
   } catch (error) {
     console.error("Error regenerating lesson:", error);

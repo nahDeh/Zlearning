@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OutlineChapter } from "@/types/outline";
-import { Prisma } from "@prisma/client";
 
-function parseOutlineContent(content: unknown): OutlineChapter[] {
-  return content as unknown as OutlineChapter[];
+function parseOutlineContent(content: string): OutlineChapter[] {
+  try {
+    return JSON.parse(content) as OutlineChapter[];
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(
@@ -41,7 +44,14 @@ export async function GET(
         project: {
           id: outline.project.id,
           title: outline.project.title,
-          profile: outline.project.profile,
+          profile: outline.project.profile
+            ? {
+                ...outline.project.profile,
+                preferences: outline.project.profile.preferences
+                  ? JSON.parse(outline.project.profile.preferences)
+                  : null,
+              }
+            : null,
         },
       },
     });
@@ -78,7 +88,7 @@ export async function PUT(
     const outline = await prisma.outline.update({
       where: { id },
       data: {
-        content: validatedChapters as unknown as Prisma.InputJsonValue,
+        content: JSON.stringify(validatedChapters),
       },
     });
 

@@ -1,9 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const DEFAULT_USER_ID = "default-user";
+
+async function ensureDefaultUser() {
+  let user = await prisma.user.findUnique({
+    where: { id: DEFAULT_USER_ID },
+  });
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        id: DEFAULT_USER_ID,
+        username: "default",
+      },
+    });
+  }
+
+  return user;
+}
+
 export async function GET() {
   try {
+    await ensureDefaultUser();
+
     const projects = await prisma.learningProject.findMany({
+      where: {
+        userId: DEFAULT_USER_ID,
+      },
       include: {
         profile: true,
       },
@@ -15,16 +39,13 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       projects: projects.map((p) => ({
-        id: p.id,
-        title: p.title,
-        status: p.status,
-        currentLessonId: p.currentLessonId,
-        createdAt: p.createdAt,
+        ...p,
         profile: p.profile
           ? {
-              topic: p.profile.topic,
-              goal: p.profile.goal,
-              currentLevel: p.profile.currentLevel,
+              ...p.profile,
+              preferences: p.profile.preferences
+                ? JSON.parse(p.profile.preferences)
+                : null,
             }
           : null,
       })),
@@ -40,34 +61,40 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { title, profile } = body;
+    await ensureDefaultUser();
 
-    if (!title || !profile) {
+    const body = await request.json();
+
+    // 支持两种格式：
+    // 1. 扁平格式: { title, topic, goal, currentLevel, timeBudget, ... }
+    // 2. 嵌套格式: { title, profile: { topic, goal, currentLevel, timeBudget, ... } }
+    const profileData = body.profile || body;
+    const title = body.title || profileData.topic;
+    const { topic, goal, currentLevel, timeBudget, learningStyle, background, preferences } = profileData;
+
+    if (!topic || !goal || !currentLevel || timeBudget === undefined) {
+      console.error("Missing required fields:", { topic, goal, currentLevel, timeBudget });
       return NextResponse.json(
-        { error: "缺少必要参数" },
+        { error: "缺少必要字段", required: ["topic", "goal", "currentLevel", "timeBudget"] },
         { status: 400 }
       );
     }
 
-    const tempUserId = "temp-user-" + Date.now();
-
     const project = await prisma.learningProject.create({
       data: {
-        userId: tempUserId,
+        userId: DEFAULT_USER_ID,
         title,
-        status: "active",
         profile: {
           create: {
-            topic: profile.topic,
-            goal: profile.goal,
-            currentLevel: profile.currentLevel,
-            timeBudget: profile.timeBudget,
-            learningStyle: profile.learningStyle,
-            preferences: {
-              background: profile.background,
-              preferences: profile.preferences,
-            },
+            topic,
+            goal,
+            currentLevel,
+            timeBudget: Number(timeBudget),
+            learningStyle: learningStyle || "mixed",
+            preferences: JSON.stringify({
+              background: background || "",
+              preferences: preferences || [],
+            }),
           },
         },
       },
@@ -79,7 +106,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       projectId: project.id,
-      project,
+      project: {
+        ...project,
+        profile: project.profile
+          ? {
+              ...project.profile,
+              preferences: project.profile.preferences
+                ? JSON.parse(project.profile.preferences)
+                : null,
+            }
+          : null,
+      },
     });
   } catch (error) {
     console.error("Error creating project:", error);

@@ -206,9 +206,15 @@ ${lessonContent}
 };
 
 export const MODEL_CONFIG = {
-  chat: "gpt-4o-mini",
+  chat: process.env.AI_MODEL || "gpt-4o-mini",
   embedding: "text-embedding-3-small",
   embeddingDimension: 1536,
+};
+
+export const AI_API_CONFIG = {
+  baseUrl: process.env.AI_API_BASE_URL || "https://api.openai.com/v1",
+  apiKey: process.env.AI_API_KEY,
+  model: process.env.AI_MODEL || "gpt-4o-mini",
 };
 
 export const FILE_CONFIG = {

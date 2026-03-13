@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         where: { id: material.id },
         data: {
           parseStatus: "failed",
-          metadata: { error: parseResult.error },
+          metadata: JSON.stringify({ error: parseResult.error }),
         },
       });
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       data: {
         parseStatus: "processing",
         extractedText: parseResult.text,
-        metadata: parseResult.metadata,
+        metadata: JSON.stringify(parseResult.metadata),
       },
     });
 
@@ -108,10 +108,10 @@ export async function POST(request: NextRequest) {
         materialId: material.id,
         chunkText: chunk.text,
         chunkIndex: index,
-        metadata: {
+        metadata: JSON.stringify({
           startIndex: chunk.startIndex,
           endIndex: chunk.endIndex,
-        },
+        }),
       })),
     });
 

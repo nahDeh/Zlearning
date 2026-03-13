@@ -21,46 +21,46 @@
 
 ## Phase 2: 核心功能模块
 
-- [ ] Task 4: 实现学习目标问答模块
-  - [ ] SubTask 4.1: 创建学习建档页面 UI
-  - [ ] SubTask 4.2: 实现 AI 对话组件（消息列表、输入框）
-  - [ ] SubTask 4.3: 创建学习画像 API（/api/questionnaire/*）
-  - [ ] SubTask 4.4: 实现 AI Prompt 模板（结构化提问、画像生成）
-  - [ ] SubTask 4.5: 实现学习画像确认页面
+- [x] Task 4: 实现学习目标问答模块
+  - [x] SubTask 4.1: 创建学习建档页面 UI
+  - [x] SubTask 4.2: 实现 AI 对话组件（消息列表、输入框）
+  - [x] SubTask 4.3: 创建学习画像 API（/api/questionnaire/*）
+  - [x] SubTask 4.4: 实现 AI Prompt 模板（结构化提问、画像生成）
+  - [x] SubTask 4.5: 实现学习画像确认页面
 
-- [ ] Task 5: 实现资料上传与解析模块
-  - [ ] SubTask 5.1: 创建文件上传组件（拖拽上传）
-  - [ ] SubTask 5.2: 实现文件上传 API（/api/materials/upload）
-  - [ ] SubTask 5.3: 实现 TXT/MD 文件解析服务
-  - [ ] SubTask 5.4: 实现文本分块与向量化服务
-  - [ ] SubTask 5.5: 创建解析结果展示页面
+- [x] Task 5: 实现资料上传与解析模块
+  - [x] SubTask 5.1: 创建文件上传组件（拖拽上传）
+  - [x] SubTask 5.2: 实现文件上传 API（/api/materials/upload）
+  - [x] SubTask 5.3: 实现 TXT/MD 文件解析服务
+  - [x] SubTask 5.4: 实现文本分块与向量化服务
+  - [x] SubTask 5.5: 创建解析结果展示页面
 
-- [ ] Task 6: 实现学习大纲生成模块
-  - [ ] SubTask 6.1: 创建大纲生成 API（/api/materials/:id/generate-outline）
-  - [ ] SubTask 6.2: 实现 RAG 检索服务（向量相似度搜索）
-  - [ ] SubTask 6.3: 实现大纲生成 Prompt 模板
-  - [ ] SubTask 6.4: 创建大纲展示与编辑页面
-  - [ ] SubTask 6.5: 实现大纲手动编辑功能（增删改章节）
+- [x] Task 6: 实现学习大纲生成模块
+  - [x] SubTask 6.1: 创建大纲生成 API（/api/materials/:id/generate-outline）
+  - [x] SubTask 6.2: 实现 RAG 检索服务（向量相似度搜索）
+  - [x] SubTask 6.3: 实现大纲生成 Prompt 模板
+  - [x] SubTask 6.4: 创建大纲展示与编辑页面
+  - [x] SubTask 6.5: 实现大纲手动编辑功能（增删改章节）
 
-- [ ] Task 7: 实现课程内容生成模块
-  - [ ] SubTask 7.1: 创建课程生成 API（/api/courses/generate）
-  - [ ] SubTask 7.2: 实现章节内容生成 Prompt 模板
-  - [ ] SubTask 7.3: 实现内容结构验证逻辑
-  - [ ] SubTask 7.4: 创建课程列表页面
+- [x] Task 7: 实现课程内容生成模块
+  - [x] SubTask 7.1: 创建课程生成 API（/api/courses/generate）
+  - [x] SubTask 7.2: 实现章节内容生成 Prompt 模板
+  - [x] SubTask 7.3: 实现内容结构验证逻辑
+  - [x] SubTask 7.4: 创建课程列表页面
 
-- [ ] Task 8: 实现章节学习模块
-  - [ ] SubTask 8.1: 创建学习中心页面（章节列表、进度显示）
-  - [ ] SubTask 8.2: 创建章节学习页面（内容展示）
-  - [ ] SubTask 8.3: 实现学习进度 API（/api/progress/*）
-  - [ ] SubTask 8.4: 实现断点续学功能
-  - [ ] SubTask 8.5: 实现学习时长记录
+- [x] Task 8: 实现章节学习模块
+  - [x] SubTask 8.1: 创建学习中心页面（章节列表、进度显示）
+  - [x] SubTask 8.2: 创建章节学习页面（内容展示）
+  - [x] SubTask 8.3: 实现学习进度 API（/api/progress/*）
+  - [x] SubTask 8.4: 实现断点续学功能
+  - [x] SubTask 8.5: 实现学习时长记录
 
-- [ ] Task 9: 实现练习题模块
-  - [ ] SubTask 9.1: 创建练习题生成 API（/api/lessons/:id/exercises）
-  - [ ] SubTask 9.2: 实现练习题生成 Prompt 模板
-  - [ ] SubTask 9.3: 创建练习题组件（选择题）
-  - [ ] SubTask 9.4: 实现答案提交与反馈 API（/api/exercises/:id/submit）
-  - [ ] SubTask 9.5: 创建答题反馈展示组件
+- [x] Task 9: 实现练习题模块
+  - [x] SubTask 9.1: 创建练习题生成 API（/api/lessons/:id/exercises）
+  - [x] SubTask 9.2: 实现练习题生成 Prompt 模板
+  - [x] SubTask 9.3: 创建练习题组件（选择题）
+  - [x] SubTask 9.4: 实现答案提交与反馈 API（/api/exercises/:id/submit）
+  - [x] SubTask 9.5: 创建答题反馈展示组件
 
 ## Phase 3: 完善与优化
 
@@ -69,10 +69,10 @@
   - [x] SubTask 10.2: 创建 BENTO 功能展示区域
   - [x] SubTask 10.3: 实现创建学习项目入口
 
-- [ ] Task 11: 实现学习进度管理
-  - [ ] SubTask 11.1: 创建进度统计服务
-  - [ ] SubTask 11.2: 创建进度展示组件
-  - [ ] SubTask 11.3: 实现学习记录查询 API
+- [x] Task 11: 实现学习进度管理
+  - [x] SubTask 11.1: 创建进度统计服务
+  - [x] SubTask 11.2: 创建进度展示组件
+  - [x] SubTask 11.3: 实现学习记录查询 API
 
 - [ ] Task 12: 错误处理与兜底方案
   - [ ] SubTask 12.1: 实现全局错误处理

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
+const AI_API_KEY = process.env.AI_API_KEY;
+const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 interface LessonContent {
   objective: string[];
@@ -13,8 +14,16 @@ interface LessonContent {
   estimatedMinutes: number;
 }
 
+interface OutlineChapter {
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+  difficulty: string;
+  orderIndex: number;
+}
+
 function isMockMode(): boolean {
-  return !OPENAI_API_KEY || OPENAI_API_KEY === "";
+  return !AI_API_KEY || AI_API_KEY === "";
 }
 
 async function generateLessonContent(
@@ -57,14 +66,14 @@ async function generateLessonContent(
 }`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AI_MODEL,
         messages: [
           {
             role: "system",
@@ -79,7 +88,7 @@ async function generateLessonContent(
     });
 
     if (!response.ok) {
-      console.error("OpenAI API error:", response.status);
+      console.error("AI API error:", response.status);
       return generateMockLessonContent(chapterTitle, chapterDescription);
     }
 
@@ -157,13 +166,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "大纲不存在" }, { status: 404 });
     }
 
-    const chapters = outline.content as Array<{
-      title: string;
-      description: string;
-      estimatedMinutes: number;
-      difficulty: string;
-      orderIndex: number;
-    }>;
+    let chapters: OutlineChapter[];
+    try {
+      chapters = JSON.parse(outline.content) as OutlineChapter[];
+    } catch {
+      return NextResponse.json({ error: "大纲内容格式错误" }, { status: 400 });
+    }
 
     if (!Array.isArray(chapters) || chapters.length === 0) {
       return NextResponse.json({ error: "大纲内容为空" }, { status: 400 });
@@ -198,16 +206,20 @@ export async function POST(request: NextRequest) {
           outlineId,
           title: chapter.title,
           orderIndex: chapter.orderIndex,
-          objective: lessonContent.objective,
-          prerequisites: lessonContent.prerequisites,
+          objective: JSON.stringify(lessonContent.objective),
+          prerequisites: JSON.stringify(lessonContent.prerequisites),
           content: lessonContent.content,
-          examples: lessonContent.examples,
+          examples: JSON.stringify(lessonContent.examples),
           summary: lessonContent.summary,
           estimatedMinutes: lessonContent.estimatedMinutes,
         },
       });
 
-      createdLessons.push(lesson);
+      createdLessons.push({
+        id: lesson.id,
+        title: lesson.title,
+        orderIndex: lesson.orderIndex,
+      });
     }
 
     return NextResponse.json({
@@ -215,11 +227,7 @@ export async function POST(request: NextRequest) {
       outlineId,
       projectId: outline.projectId,
       lessonCount: createdLessons.length,
-      lessons: createdLessons.map((l) => ({
-        id: l.id,
-        title: l.title,
-        orderIndex: l.orderIndex,
-      })),
+      lessons: createdLessons,
     });
   } catch (error) {
     console.error("Error generating course:", error);

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
+const AI_API_KEY = process.env.AI_API_KEY;
+const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 interface GeneratedExercise {
   question: string;
@@ -13,7 +14,16 @@ interface GeneratedExercise {
 }
 
 function isMockMode(): boolean {
-  return !OPENAI_API_KEY || OPENAI_API_KEY === "";
+  return !AI_API_KEY || AI_API_KEY === "";
+}
+
+function parseJsonField<T>(field: string | null, defaultValue: T): T {
+  if (!field) return defaultValue;
+  try {
+    return JSON.parse(field) as T;
+  } catch {
+    return defaultValue;
+  }
 }
 
 async function generateExercisesWithAI(
@@ -45,14 +55,14 @@ async function generateExercisesWithAI(
 ]`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AI_MODEL,
         messages: [
           {
             role: "system",
@@ -67,7 +77,7 @@ async function generateExercisesWithAI(
     });
 
     if (!response.ok) {
-      console.error("OpenAI API error:", response.status);
+      console.error("AI API error:", response.status);
       return generateMockExercises(lessonTitle, count);
     }
 
@@ -134,7 +144,7 @@ export async function GET(
         lessonId: e.lessonId,
         type: e.type,
         question: e.question,
-        options: e.options,
+        options: parseJsonField<string[]>(e.options, []),
         correctAnswer: e.correctAnswer,
         explanation: e.explanation,
         difficulty: e.difficulty,
@@ -181,7 +191,7 @@ export async function POST(
           lessonId: id,
           type: "multiple_choice",
           question: exercise.question,
-          options: exercise.options,
+          options: JSON.stringify(exercise.options),
           correctAnswer: exercise.correctAnswer,
           explanation: exercise.explanation,
           difficulty: exercise.difficulty,
@@ -193,7 +203,7 @@ export async function POST(
         lessonId: created.lessonId,
         type: created.type,
         question: created.question,
-        options: created.options,
+        options: parseJsonField<string[]>(created.options, []),
         correctAnswer: created.correctAnswer,
         explanation: created.explanation,
         difficulty: created.difficulty,

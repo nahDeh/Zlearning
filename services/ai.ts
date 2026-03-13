@@ -5,15 +5,12 @@ import {
   AnswerResponse,
 } from "@/types/questionnaire";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
+const AI_API_KEY = process.env.AI_API_KEY;
+const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 function isMockMode(): boolean {
-  return !OPENAI_API_KEY || OPENAI_API_KEY === "";
-}
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return !AI_API_KEY || AI_API_KEY === "";
 }
 
 export const QUESTIONS = [
@@ -69,7 +66,7 @@ export const QUESTIONS = [
 export function getFirstQuestion(): ChatMessage {
   const question = QUESTIONS[0];
   return {
-    id: generateId(),
+    id: question.id,
     role: "assistant",
     content: question.question,
     timestamp: new Date(),
@@ -95,7 +92,7 @@ export function getNextQuestion(
 
   const nextQuestion = QUESTIONS[nextIndex];
   const message: ChatMessage = {
-    id: generateId(),
+    id: nextQuestion.id,
     role: "assistant",
     content: nextQuestion.question,
     timestamp: new Date(),
@@ -134,14 +131,14 @@ export async function generateLearningProfile(
 }`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AI_MODEL,
         messages: [
           {
             role: "system",
@@ -156,7 +153,7 @@ export async function generateLearningProfile(
     });
 
     if (!response.ok) {
-      console.error("OpenAI API error:", response.status);
+      console.error("AI API error:", response.status);
       return generateMockProfile(answers);
     }
 
@@ -234,14 +231,14 @@ export async function generateFollowUpQuestion(
   ];
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model: AI_MODEL,
         messages,
         temperature: 0.7,
         max_tokens: 100,
@@ -260,7 +257,7 @@ export async function generateFollowUpQuestion(
     }
 
     return {
-      id: generateId(),
+      id: `followup-${Date.now()}`,
       role: "assistant",
       content,
       timestamp: new Date(),

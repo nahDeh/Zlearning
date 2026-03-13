@@ -12,20 +12,32 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 243 75% 59%;
+    --primary: 187 94% 43%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 187 94% 43%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 243 75% 59%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
+    --ring: 187 94% 43%;
     --radius: 0.75rem;
+    
+    /* Cyan color scale */
+    --cyan-50: 187 94% 97%;
+    --cyan-100: 187 94% 92%;
+    --cyan-200: 186 94% 82%;
+    --cyan-300: 185 96% 70%;
+    --cyan-400: 186 94% 56%;
+    --cyan-500: 186 94% 43%;
+    --cyan-600: 187 94% 35%;
+    --cyan-700: 188 95% 28%;
+    --cyan-800: 189 94% 23%;
+    --cyan-900: 190 91% 19%;
   }
 
   .dark {
@@ -65,15 +77,18 @@
 
 @layer utilities {
   .gradient-primary {
-    @apply bg-gradient-to-r from-indigo-600 to-cyan-500;
+    @apply bg-gradient-to-r from-cyan-500 to-cyan-600;
   }
   .gradient-text {
-    @apply bg-gradient-to-r from-indigo-600 to-cyan-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-cyan-500 to-indigo-500 bg-clip-text text-transparent;
   }
   .glass {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20;
+    @apply bg-white/80 backdrop-blur-xl border border-white/40;
   }
   .glass-dark {
-    @apply bg-black/50 backdrop-blur-xl border border-white/10;
+    @apply bg-slate-800/80 backdrop-blur-xl border border-slate-700/50;
+  }
+  .card-hover {
+    @apply hover:shadow-xl hover:shadow-cyan-100/30 transition-all duration-300 hover:-translate-y-0.5;
   }
 }

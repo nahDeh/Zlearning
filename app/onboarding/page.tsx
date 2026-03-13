@@ -13,6 +13,8 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+const QUESTION_KEYS = ["topic", "goal", "currentLevel", "timeBudget", "learningStyle", "background"];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [state, setState] = React.useState<QuestionnaireState>({
@@ -21,6 +23,7 @@ export default function OnboardingPage() {
     answers: {},
     isComplete: false,
     isLoading: true,
+    currentQuestionId: "",
   });
   const [isGenerating, setIsGenerating] = React.useState(false);
 
@@ -38,6 +41,7 @@ export default function OnboardingPage() {
           ...prev,
           messages: [data.firstQuestion],
           isLoading: false,
+          currentQuestionId: data.firstQuestion.id,
         }));
       }
     } catch (error) {
@@ -54,24 +58,21 @@ export default function OnboardingPage() {
       timestamp: new Date(),
     };
 
+    const messagesWithUser = [...state.messages, userMessage];
+
     setState((prev) => ({
       ...prev,
-      messages: [...prev.messages, userMessage],
+      messages: messagesWithUser,
       isLoading: true,
     }));
 
     try {
-      const lastAssistantMessage = [...state.messages]
-        .reverse()
-        .find((m) => m.role === "assistant");
-
       const response = await fetch("/api/questionnaire/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionId: lastAssistantMessage?.id || "unknown",
+          questionId: state.currentQuestionId,
           answer: message,
-          conversationHistory: state.messages,
         }),
       });
 
@@ -80,9 +81,8 @@ export default function OnboardingPage() {
       if (data.success) {
         setState((prev) => {
           const newAnswers = { ...prev.answers };
-          const questionKeys = ["topic", "goal", "currentLevel", "timeBudget", "learningStyle", "background"];
-          if (prev.currentQuestionIndex < questionKeys.length) {
-            newAnswers[questionKeys[prev.currentQuestionIndex]] = message;
+          if (prev.currentQuestionIndex < QUESTION_KEYS.length) {
+            newAnswers[QUESTION_KEYS[prev.currentQuestionIndex]] = message;
           }
 
           return {
@@ -91,11 +91,15 @@ export default function OnboardingPage() {
             currentQuestionIndex: prev.currentQuestionIndex + 1,
             isComplete: data.isComplete || false,
             messages: data.nextQuestion
-              ? [...prev.messages, userMessage, data.nextQuestion]
-              : [...prev.messages, userMessage],
+              ? [...prev.messages, data.nextQuestion]
+              : prev.messages,
             isLoading: false,
+            currentQuestionId: data.nextQuestion?.id || "",
           };
         });
+      } else {
+        console.error("Answer API error:", data.error);
+        setState((prev) => ({ ...prev, isLoading: false }));
       }
     } catch (error) {
       console.error("Failed to send answer:", error);
@@ -129,43 +133,49 @@ export default function OnboardingPage() {
   }
 
   const progress = Math.min(
-    ((state.currentQuestionIndex + 1) / 6) * 100,
+    ((state.currentQuestionIndex + 1) / QUESTION_KEYS.length) * 100,
     100
   );
 
   if (state.isLoading && state.messages.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/20">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">正在初始化学习助手...</p>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-cyan-200/50">
+            <Loader2 className="h-6 w-6 animate-spin text-white" />
+          </div>
+          <p className="text-slate-600 font-medium">正在初始化学习助手...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/20">
+      <header className="border-b border-slate-200/60 glass sticky top-0 z-10">
         <div className="container max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-semibold">学习目标设定</h1>
-            <span className="text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center shadow-md shadow-cyan-200/50">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <h1 className="text-lg font-semibold text-slate-800">学习目标设定</h1>
+            </div>
+            <span className="text-sm font-medium text-cyan-600 bg-cyan-50 px-3 py-1 rounded-full">
               {Math.round(progress)}% 完成
             </span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-2 bg-slate-200 [&>div]:bg-gradient-to-r [&>div]:from-cyan-500 [&>div]:to-cyan-600" />
         </div>
       </header>
-
       <main className="flex-1 container max-w-3xl mx-auto px-4 py-6">
-        <Card className="h-[calc(100vh-220px)] flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+        <Card className="h-[calc(100vh-220px)] flex flex-col glass rounded-2xl shadow-xl border-0">
+          <CardHeader className="pb-2 border-b border-slate-100">
+            <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+              <Sparkles className="h-5 w-5 text-cyan-500" />
               AI 学习助手
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-slate-500">
               回答几个问题，让我为你定制专属学习计划
             </CardDescription>
           </CardHeader>
@@ -178,14 +188,13 @@ export default function OnboardingPage() {
             />
           </div>
         </Card>
-
         {state.isComplete && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-6 flex justify-center">
             <Button
               size="lg"
               onClick={handleComplete}
               disabled={isGenerating}
-              className="px-8"
+              className="px-8 rounded-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 shadow-lg shadow-cyan-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-200/40 hover:-translate-y-0.5"
             >
               {isGenerating ? (
                 <>
