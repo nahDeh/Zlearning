@@ -1,6 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export async function GET() {
+  try {
+    const projects = await prisma.learningProject.findMany({
+      include: {
+        profile: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      projects: projects.map((p) => ({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        currentLessonId: p.currentLessonId,
+        createdAt: p.createdAt,
+        profile: p.profile
+          ? {
+              topic: p.profile.topic,
+              goal: p.profile.goal,
+              currentLevel: p.profile.currentLevel,
+            }
+          : null,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching projects:", error);
+    return NextResponse.json(
+      { error: "获取项目列表失败" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
