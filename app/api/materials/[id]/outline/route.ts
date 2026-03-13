@@ -149,6 +149,45 @@ function generateMockOutline(): OutlineChapter[] {
   ];
 }
 
+async function createOrReuseOutline(
+  projectId: string,
+  chapters: OutlineChapter[],
+  regenerate: boolean
+) {
+  return prisma.$transaction(async (tx) => {
+    const activeOutline = await tx.outline.findFirst({
+      where: { projectId, isActive: true },
+      orderBy: { version: "desc" },
+    });
+
+    if (!regenerate && activeOutline) {
+      return { outline: activeOutline, reusedExisting: true };
+    }
+
+    const latestOutline = await tx.outline.findFirst({
+      where: { projectId },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    });
+
+    await tx.outline.updateMany({
+      where: { projectId, isActive: true },
+      data: { isActive: false },
+    });
+
+    const outline = await tx.outline.create({
+      data: {
+        projectId,
+        version: (latestOutline?.version ?? 0) + 1,
+        content: JSON.stringify(chapters),
+        isActive: true,
+      },
+    });
+
+    return { outline, reusedExisting: false };
+  });
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -207,31 +246,17 @@ export async function POST(
       learningStyle: profile.learningStyle || "mixed",
     });
 
-    if (material.project?.outlines && material.project.outlines.length > 0) {
-      await prisma.outline.updateMany({
-        where: { projectId: material.projectId, isActive: true },
-        data: { isActive: false },
-      });
-    }
-
-    const newVersion = material.project?.outlines?.[0]?.version
-      ? material.project.outlines[0].version + 1
-      : 1;
-
-    const outline = await prisma.outline.create({
-      data: {
-        projectId: material.projectId,
-        version: newVersion,
-        content: JSON.stringify(chapters),
-        isActive: true,
-      },
-    });
+    const { outline, reusedExisting } = await createOrReuseOutline(
+      material.projectId,
+      chapters,
+      regenerate
+    );
 
     return NextResponse.json({
       success: true,
       outline: {
         id: outline.id,
-        chapters,
+        chapters: reusedExisting ? parseOutlineContent(outline.content) : chapters,
         version: outline.version,
       },
     });

@@ -22,8 +22,43 @@ interface OutlineChapter {
   orderIndex: number;
 }
 
+interface LessonInsertPayload {
+  title: string;
+  orderIndex: number;
+  objective: string;
+  prerequisites: string;
+  content: string;
+  examples: string;
+  summary: string;
+  estimatedMinutes: number;
+}
+
 function isMockMode(): boolean {
   return !AI_API_KEY || AI_API_KEY === "";
+}
+
+function generateMockLessonContent(
+  chapterTitle: string,
+  chapterDescription: string
+): LessonContent {
+  return {
+    objective: [
+      `理解 ${chapterTitle} 的核心概念`,
+      `掌握 ${chapterTitle} 的基本使用方式`,
+      `能够把 ${chapterTitle} 应用到实际问题`,
+    ],
+    prerequisites: ["基础知识", "基本概念理解"],
+    content: `## ${chapterTitle}\n\n${chapterDescription}\n\n### 核心概念\n\n本章会围绕 ${chapterTitle} 展开讲解。\n\n### 关键要点\n\n1. 先理解定义\n2. 再看常见用法\n3. 最后结合实际练习`,
+    examples: [
+      {
+        title: `${chapterTitle} 示例`,
+        code: "// example\nconsole.log('Hello, world!');",
+        explanation: `这个示例展示了 ${chapterTitle} 的基本思路。`,
+      },
+    ],
+    summary: `本章总结了 ${chapterTitle} 的核心知识点。`,
+    estimatedMinutes: 30,
+  };
 }
 
 async function generateLessonContent(
@@ -38,31 +73,28 @@ async function generateLessonContent(
     return generateMockLessonContent(chapterTitle, chapterDescription);
   }
 
-  const prompt = `你是一位专业的教育内容创作者。请为以下章节生成详细的学习内容。
+  const prompt = `You are an instructional designer. Generate lesson content as JSON only.
+Topic: ${topic}
+Goal: ${goal}
+Current level: ${currentLevel}
+Chapter title: ${chapterTitle}
+Chapter description: ${chapterDescription}
+Difficulty: ${difficulty}
 
-课程主题: ${topic}
-学习目标: ${goal}
-学习者水平: ${currentLevel}
-
-章节信息:
-- 标题: ${chapterTitle}
-- 描述: ${chapterDescription}
-- 难度: ${difficulty}
-
-请生成以下内容，以 JSON 格式返回（不要包含任何其他文字）：
+Return JSON with:
 {
-  "objective": ["学习目标1", "学习目标2", "学习目标3"],
-  "prerequisites": ["前置知识1", "前置知识2"],
-  "content": "详细的核心内容，使用 Markdown 格式，包含多个段落和子标题",
+  "objective": ["..."],
+  "prerequisites": ["..."],
+  "content": "markdown content",
   "examples": [
     {
-      "title": "示例标题",
-      "code": "示例代码（如果适用）",
-      "explanation": "示例解释"
+      "title": "example title",
+      "code": "optional code",
+      "explanation": "example explanation"
     }
   ],
-  "summary": "本章节的总结",
-  "estimatedMinutes": 预计学习时间（分钟，数字）
+  "summary": "lesson summary",
+  "estimatedMinutes": 30
 }`;
 
   try {
@@ -77,8 +109,7 @@ async function generateLessonContent(
         messages: [
           {
             role: "system",
-            content:
-              "你是一位专业的教育内容创作者，擅长创建结构清晰、内容丰富的学习材料。请只返回 JSON 格式的结果，不要包含任何其他文字。",
+            content: "Return valid JSON only.",
           },
           { role: "user", content: prompt },
         ],
@@ -88,54 +119,30 @@ async function generateLessonContent(
     });
 
     if (!response.ok) {
-      console.error("AI API error:", response.status);
       return generateMockLessonContent(chapterTitle, chapterDescription);
     }
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content;
-
     if (!content) {
       return generateMockLessonContent(chapterTitle, chapterDescription);
     }
 
     const lessonContent = JSON.parse(content);
     return {
-      objective: lessonContent.objective || [],
-      prerequisites: lessonContent.prerequisites || [],
+      objective: Array.isArray(lessonContent.objective) ? lessonContent.objective : [],
+      prerequisites: Array.isArray(lessonContent.prerequisites)
+        ? lessonContent.prerequisites
+        : [],
       content: lessonContent.content || "",
-      examples: lessonContent.examples || [],
+      examples: Array.isArray(lessonContent.examples) ? lessonContent.examples : [],
       summary: lessonContent.summary || "",
-      estimatedMinutes: lessonContent.estimatedMinutes || 30,
+      estimatedMinutes: Number(lessonContent.estimatedMinutes) || 30,
     };
   } catch (error) {
     console.error("Error generating lesson content:", error);
     return generateMockLessonContent(chapterTitle, chapterDescription);
   }
-}
-
-function generateMockLessonContent(
-  chapterTitle: string,
-  chapterDescription: string
-): LessonContent {
-  return {
-    objective: [
-      `理解 ${chapterTitle} 的核心概念`,
-      `掌握 ${chapterTitle} 的基本操作`,
-      `能够应用 ${chapterTitle} 解决实际问题`,
-    ],
-    prerequisites: ["基础知识", "基本概念理解"],
-    content: `## ${chapterTitle}\n\n${chapterDescription}\n\n### 核心概念\n\n本章节将介绍 ${chapterTitle} 的核心概念和基础知识。\n\n### 详细内容\n\n1. 第一个要点\n2. 第二个要点\n3. 第三个要点\n\n### 实践建议\n\n建议在学习过程中多动手实践，加深理解。`,
-    examples: [
-      {
-        title: `${chapterTitle} 基础示例`,
-        code: "// 示例代码\nconsole.log('Hello, World!');",
-        explanation: `这是一个展示 ${chapterTitle} 基础用法的示例。`,
-      },
-    ],
-    summary: `本章节介绍了 ${chapterTitle} 的核心概念和基本操作，为后续学习打下基础。`,
-    estimatedMinutes: 30,
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -178,18 +185,11 @@ export async function POST(request: NextRequest) {
     }
 
     const profile = outline.project.profile;
-    const topic = profile?.topic || "未知主题";
-    const goal = profile?.goal || "掌握相关知识";
+    const topic = profile?.topic || "Unknown topic";
+    const goal = profile?.goal || "Master the key concepts";
     const currentLevel = profile?.currentLevel || "beginner";
 
-    const existingLessons = outline.lessons;
-    if (existingLessons.length > 0) {
-      await prisma.lesson.deleteMany({
-        where: { outlineId },
-      });
-    }
-
-    const createdLessons = [];
+    const lessonPayloads: LessonInsertPayload[] = [];
 
     for (const chapter of chapters) {
       const lessonContent = await generateLessonContent(
@@ -201,26 +201,51 @@ export async function POST(request: NextRequest) {
         currentLevel
       );
 
-      const lesson = await prisma.lesson.create({
+      lessonPayloads.push({
+        title: chapter.title,
+        orderIndex: chapter.orderIndex,
+        objective: JSON.stringify(lessonContent.objective),
+        prerequisites: JSON.stringify(lessonContent.prerequisites),
+        content: lessonContent.content,
+        examples: JSON.stringify(lessonContent.examples),
+        summary: lessonContent.summary,
+        estimatedMinutes: lessonContent.estimatedMinutes,
+      });
+    }
+
+    const createdLessons = await prisma.$transaction(async (tx) => {
+      if (outline.lessons.length > 0) {
+        await tx.lesson.deleteMany({
+          where: { outlineId },
+        });
+      }
+
+      const lessons: Array<{ id: string; title: string; orderIndex: number }> = [];
+
+      for (const lessonData of lessonPayloads) {
+        const lesson = await tx.lesson.create({
+          data: {
+            outlineId,
+            ...lessonData,
+          },
+        });
+
+        lessons.push({
+          id: lesson.id,
+          title: lesson.title,
+          orderIndex: lesson.orderIndex,
+        });
+      }
+
+      await tx.learningProject.update({
+        where: { id: outline.projectId },
         data: {
-          outlineId,
-          title: chapter.title,
-          orderIndex: chapter.orderIndex,
-          objective: JSON.stringify(lessonContent.objective),
-          prerequisites: JSON.stringify(lessonContent.prerequisites),
-          content: lessonContent.content,
-          examples: JSON.stringify(lessonContent.examples),
-          summary: lessonContent.summary,
-          estimatedMinutes: lessonContent.estimatedMinutes,
+          currentLessonId: lessons[0]?.id ?? null,
         },
       });
 
-      createdLessons.push({
-        id: lesson.id,
-        title: lesson.title,
-        orderIndex: lesson.orderIndex,
-      });
-    }
+      return lessons;
+    });
 
     return NextResponse.json({
       success: true,

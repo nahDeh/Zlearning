@@ -12,7 +12,6 @@ interface Exercise {
   type: string;
   question: string;
   options: string[];
-  correctAnswer: string;
   explanation: string;
   difficulty: string | null;
 }
@@ -165,7 +164,7 @@ export function ExerciseQuiz({ exercises, onComplete }: ExerciseQuizProps) {
         <div className="space-y-3">
           {currentExercise.options.map((option, index) => {
             const isSelected = selectedAnswer === option;
-            const isCorrect = submitted && option === currentExercise.correctAnswer;
+            const isCorrect = submitted && option === result?.correctAnswer;
             const isWrong = submitted && isSelected && !result?.isCorrect;
 
             return (

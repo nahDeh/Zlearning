@@ -1,9 +1,22 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { Upload, File, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle,
+  File,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -16,17 +29,33 @@ export interface UploadFile {
   materialId?: string;
 }
 
+export interface UploadedMaterial {
+  id: string;
+  filename: string;
+  fileType: string;
+  fileSize: number;
+  parseStatus: string;
+  chunkCount: number;
+  metadata?: {
+    pageCount?: number;
+    wordCount?: number;
+    charCount?: number;
+    title?: string;
+    author?: string;
+  };
+}
+
 export interface FileUploadProps {
   projectId: string;
-  onUploadComplete?: (material: { id: string; filename: string }) => void;
+  onUploadComplete?: (material: UploadedMaterial) => void;
   onUploadError?: (error: string) => void;
   maxFileSize?: number;
   acceptedTypes?: string[];
   className?: string;
 }
 
-const ACCEPTED_TYPES = [".txt", ".md", ".pdf"];
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ACCEPTED_TYPES = [".txt", ".md", ".pdf", ".epub"];
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export function FileUpload({
   projectId,
@@ -38,127 +67,165 @@ export function FileUpload({
 }: FileUploadProps) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingAll, setIsUploadingAll] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const generateId = () => Math.random().toString(36).substring(2, 9);
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      if (file.size > maxFileSize) {
+        return `文件大小超过限制 (${(maxFileSize / 1024 / 1024).toFixed(0)}MB)`;
+      }
 
-  const validateFile = (file: File): string | null => {
-    if (file.size > maxFileSize) {
-      return `文件大小超过限制 (${(maxFileSize / 1024 / 1024).toFixed(0)}MB)`;
-    }
+      const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
+      if (!acceptedTypes.includes(ext)) {
+        return `不支持的文件类型，仅支持 ${acceptedTypes.join(", ")}`;
+      }
 
-    const ext = "." + file.name.split(".").pop()?.toLowerCase();
-    if (!acceptedTypes.includes(ext)) {
-      return `不支持的文件类型，仅支持 ${acceptedTypes.join(", ")}`;
-    }
-
-    return null;
-  };
+      return null;
+    },
+    [acceptedTypes, maxFileSize]
+  );
 
   const handleFiles = useCallback(
     (fileList: FileList) => {
-      const newFiles: UploadFile[] = [];
-
-      Array.from(fileList).forEach((file) => {
+      const newFiles: UploadFile[] = Array.from(fileList).map((file) => {
         const error = validateFile(file);
-        newFiles.push({
-          id: generateId(),
+
+        return {
+          id: crypto.randomUUID(),
           file,
           status: error ? "error" : "pending",
           progress: 0,
           error: error || undefined,
-        });
+        };
       });
 
       setFiles((prev) => [...prev, ...newFiles]);
     },
-    [maxFileSize, acceptedTypes]
+    [validateFile]
   );
 
-  const uploadFile = async (uploadFileItem: UploadFile) => {
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === uploadFileItem.id ? { ...f, status: "uploading", progress: 0 } : f
-      )
-    );
+  const uploadFile = useCallback(
+    async (uploadFileItem: UploadFile) => {
+      setFiles((prev) =>
+        prev.map((file) =>
+          file.id === uploadFileItem.id
+            ? {
+                ...file,
+                status: "uploading",
+                progress: 15,
+                error: undefined,
+              }
+            : file
+        )
+      );
+
+      try {
+        const formData = new FormData();
+        formData.append("file", uploadFileItem.file);
+        formData.append("projectId", projectId);
+
+        const response = await fetch("/api/materials/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = (await response.json()) as {
+          success?: boolean;
+          error?: string;
+          material?: UploadedMaterial;
+        };
+
+        if (!response.ok || !result.success || !result.material) {
+          throw new Error(result.error || "上传失败");
+        }
+
+        const material = result.material;
+
+        setFiles((prev) =>
+          prev.map((file) =>
+            file.id === uploadFileItem.id
+              ? {
+                  ...file,
+                  status: "success",
+                  progress: 100,
+                  materialId: material.id,
+                }
+              : file
+          )
+        );
+
+        onUploadComplete?.(material);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "上传失败";
+
+        setFiles((prev) =>
+          prev.map((file) =>
+            file.id === uploadFileItem.id
+              ? {
+                  ...file,
+                  status: "error",
+                  progress: 0,
+                  error: errorMessage,
+                }
+              : file
+          )
+        );
+
+        onUploadError?.(errorMessage);
+      }
+    },
+    [onUploadComplete, onUploadError, projectId]
+  );
+
+  const handleUploadAll = async () => {
+    if (isUploadingAll) {
+      return;
+    }
+
+    const pendingFiles = files.filter((file) => file.status === "pending");
+    if (pendingFiles.length === 0) {
+      return;
+    }
+
+    setIsUploadingAll(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", uploadFileItem.file);
-      formData.append("projectId", projectId);
-
-      const response = await fetch("/api/materials/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "上传失败");
+      for (const file of pendingFiles) {
+        await uploadFile(file);
       }
-
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFileItem.id
-            ? {
-                ...f,
-                status: "success",
-                progress: 100,
-                materialId: result.material.id,
-              }
-            : f
-        )
-      );
-
-      onUploadComplete?.({
-        id: result.material.id,
-        filename: uploadFileItem.file.name,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "上传失败";
-
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFileItem.id
-            ? { ...f, status: "error", error: errorMessage }
-            : f
-        )
-      );
-
-      onUploadError?.(errorMessage);
+    } finally {
+      setIsUploadingAll(false);
     }
-  };
-
-  const handleUploadAll = () => {
-    files.filter((f) => f.status === "pending").forEach(uploadFile);
   };
 
   const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files);
+
+    if (event.dataTransfer.files.length > 0) {
+      handleFiles(event.dataTransfer.files);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files);
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      handleFiles(event.target.files);
+      event.target.value = "";
     }
   };
 
@@ -168,15 +235,15 @@ export function FileUpload({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const getFileIcon = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase();
+  const getFileIcon = () => {
     return <File className="h-5 w-5" />;
   };
 
-  const pendingCount = files.filter((f) => f.status === "pending").length;
-  const uploadingCount = files.filter((f) => f.status === "uploading").length;
-  const successCount = files.filter((f) => f.status === "success").length;
-  const errorCount = files.filter((f) => f.status === "error").length;
+  const pendingCount = files.filter((file) => file.status === "pending").length;
+  const uploadingCount = files.filter((file) => file.status === "uploading").length;
+  const successCount = files.filter((file) => file.status === "success").length;
+  const errorCount = files.filter((file) => file.status === "error").length;
+  const isBusy = isUploadingAll || uploadingCount > 0;
 
   return (
     <Card className={className}>
@@ -186,13 +253,14 @@ export function FileUpload({
           上传学习资料
         </CardTitle>
         <CardDescription>
-          支持 {acceptedTypes.join(", ")} 格式，单个文件最大 {(maxFileSize / 1024 / 1024).toFixed(0)}MB
+          支持 {acceptedTypes.join(", ")} 格式，单个文件最大{" "}
+          {(maxFileSize / 1024 / 1024).toFixed(0)}MB
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
           className={cn(
-            "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+            "cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors",
             isDragging
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
@@ -202,13 +270,11 @@ export function FileUpload({
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground mb-2">
+          <Upload className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
+          <p className="mb-2 text-sm text-muted-foreground">
             拖拽文件到此处，或点击选择文件
           </p>
-          <p className="text-xs text-muted-foreground">
-            支持批量上传多个文件
-          </p>
+          <p className="text-xs text-muted-foreground">支持批量上传多个文件</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -226,10 +292,10 @@ export function FileUpload({
                 {successCount} 成功 / {errorCount} 失败 / {pendingCount} 待上传
               </span>
               {pendingCount > 0 && (
-                <Button size="sm" onClick={handleUploadAll} disabled={uploadingCount > 0}>
-                  {uploadingCount > 0 ? (
+                <Button size="sm" onClick={handleUploadAll} disabled={isBusy}>
+                  {isBusy ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       上传中...
                     </>
                   ) : (
@@ -239,14 +305,16 @@ export function FileUpload({
               )}
             </div>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="max-h-60 space-y-2 overflow-y-auto">
               {files.map((fileItem) => (
                 <div
                   key={fileItem.id}
                   className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg border",
-                    fileItem.status === "error" && "border-destructive/50 bg-destructive/5",
-                    fileItem.status === "success" && "border-green-500/50 bg-green-500/5"
+                    "flex items-center gap-3 rounded-lg border p-3",
+                    fileItem.status === "error" &&
+                      "border-destructive/50 bg-destructive/5",
+                    fileItem.status === "success" &&
+                      "border-green-500/50 bg-green-500/5"
                   )}
                 >
                   <div className="flex-shrink-0">
@@ -257,24 +325,28 @@ export function FileUpload({
                     ) : fileItem.status === "error" ? (
                       <AlertCircle className="h-5 w-5 text-destructive" />
                     ) : (
-                      getFileIcon(fileItem.file.name)
+                      getFileIcon()
                     )}
                   </div>
 
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium truncate">{fileItem.file.name}</p>
-                      <span className="text-xs text-muted-foreground ml-2">
+                      <p className="truncate text-sm font-medium">
+                        {fileItem.file.name}
+                      </p>
+                      <span className="ml-2 text-xs text-muted-foreground">
                         {formatFileSize(fileItem.file.size)}
                       </span>
                     </div>
 
                     {fileItem.status === "uploading" && (
-                      <Progress value={fileItem.progress} className="h-1 mt-2" />
+                      <Progress value={fileItem.progress} className="mt-2 h-1" />
                     )}
 
                     {fileItem.error && (
-                      <p className="text-xs text-destructive mt-1">{fileItem.error}</p>
+                      <p className="mt-1 text-xs text-destructive">
+                        {fileItem.error}
+                      </p>
                     )}
                   </div>
 

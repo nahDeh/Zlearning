@@ -180,6 +180,92 @@ export async function generateLearningProfile(
   }
 }
 
+export interface RecommendedBook {
+  title: string;
+  author: string;
+  description: string;
+  level: "入门" | "进阶" | "高级";
+  reason: string;
+}
+
+export async function generateRecommendedBooks(
+  profile: LearningProfileDraft
+): Promise<RecommendedBook[]> {
+  if (isMockMode()) {
+    return generateMockBooks(profile.topic);
+  }
+
+  const prompt = `作为一个专业的学习顾问，请根据以下学习画像推荐 3-5 本最适合的书籍。
+
+学习画像：
+- 学习主题: ${profile.topic}
+- 学习目标: ${profile.goal}
+- 当前水平: ${profile.currentLevel}
+- 每周学习时间: ${profile.timeBudget} 小时
+- 学习风格: ${profile.learningStyle}
+- 背景: ${profile.background || "未提供"}
+
+请推荐真实存在、广受好评的书籍，优先推荐中文书籍或经典英文书籍的中文译本。
+
+以 JSON 数组格式返回（不要包含任何其他文字）：
+[
+  {
+    "title": "书名",
+    "author": "作者",
+    "description": "书籍简介（一句话）",
+    "level": "入门/进阶/高级",
+    "reason": "推荐理由"
+  }
+]`;
+
+  try {
+    const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${AI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是一个专业的学习顾问，擅长根据学习者的需求推荐最合适的书籍。请只返回 JSON 数组格式的结果，不要包含任何其他文字。",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI API error:", response.status);
+      return generateMockBooks(profile.topic);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    if (!content) {
+      return generateMockBooks(profile.topic);
+    }
+
+    const books = JSON.parse(content);
+    return books.map((book: RecommendedBook) => ({
+      title: book.title || "未知书籍",
+      author: book.author || "未知作者",
+      description: book.description || "",
+      level: book.level || "入门",
+      reason: book.reason || "",
+    }));
+  } catch (error) {
+    console.error("Error generating book recommendations:", error);
+    return generateMockBooks(profile.topic);
+  }
+}
+
 function generateMockProfile(answers: Record<string, string>): LearningProfileDraft {
   const levelMap: Record<string, "beginner" | "intermediate" | "advanced"> = {
     beginner: "beginner",
@@ -207,6 +293,32 @@ function generateMockProfile(answers: Record<string, string>): LearningProfileDr
       "定期复习巩固",
     ],
   };
+}
+
+function generateMockBooks(topic: string): RecommendedBook[] {
+  return [
+    {
+      title: `${topic} 入门经典`,
+      author: "权威作者",
+      description: `最适合初学者的 ${topic} 入门书籍`,
+      level: "入门",
+      reason: "内容浅显易懂，适合零基础学习者",
+    },
+    {
+      title: `${topic} 实战指南`,
+      author: "实战专家",
+      description: `通过实际案例学习 ${topic}`,
+      level: "进阶",
+      reason: "理论与实践结合，适合有一定基础的学习者",
+    },
+    {
+      title: `${topic} 高级教程`,
+      author: "资深专家",
+      description: `深入探讨 ${topic} 的高级主题`,
+      level: "高级",
+      reason: "内容深入，适合想要精通的学习者",
+    },
+  ];
 }
 
 export async function generateFollowUpQuestion(

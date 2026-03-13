@@ -145,7 +145,6 @@ export async function GET(
         type: e.type,
         question: e.question,
         options: parseJsonField<string[]>(e.options, []),
-        correctAnswer: e.correctAnswer,
         explanation: e.explanation,
         difficulty: e.difficulty,
       }))

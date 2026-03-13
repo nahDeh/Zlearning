@@ -10,6 +10,15 @@ function parseOutlineContent(content: string): OutlineChapter[] {
   }
 }
 
+function parseJsonField<T>(field: string | null, defaultValue: T): T {
+  if (!field) return defaultValue;
+  try {
+    return JSON.parse(field) as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -20,6 +29,17 @@ export async function GET(
     const outline = await prisma.outline.findUnique({
       where: { id },
       include: {
+        lessons: {
+          select: {
+            id: true,
+            title: true,
+            orderIndex: true,
+            objective: true,
+            content: true,
+            estimatedMinutes: true,
+          },
+          orderBy: { orderIndex: "asc" },
+        },
         project: {
           include: {
             profile: true,
@@ -41,6 +61,14 @@ export async function GET(
         content: parseOutlineContent(outline.content),
         isActive: outline.isActive,
         createdAt: outline.createdAt,
+        lessons: outline.lessons.map((lesson) => ({
+          id: lesson.id,
+          title: lesson.title,
+          orderIndex: lesson.orderIndex,
+          objective: parseJsonField<string[]>(lesson.objective, []),
+          content: lesson.content,
+          estimatedMinutes: lesson.estimatedMinutes,
+        })),
         project: {
           id: outline.project.id,
           title: outline.project.title,

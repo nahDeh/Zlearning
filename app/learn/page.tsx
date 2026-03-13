@@ -126,6 +126,8 @@ export default function LearnPage() {
   const [projects, setProjects] = useState<LearningProject[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, StudyProgress>>({});
   const [loading, setLoading] = useState(true);
+  const getProjectHref = (projectId: string, currentLessonId: string | null) =>
+    currentLessonId ? `/lessons/${currentLessonId}` : `/projects/${projectId}`;
 
   useEffect(() => {
     async function fetchData() {
@@ -157,6 +159,9 @@ export default function LearnPage() {
 
   const currentProject = projects[0];
   const currentProgress = currentProject ? progressMap[currentProject.id] : null;
+  const currentProjectHref = currentProject
+    ? getProjectHref(currentProject.id, currentProgress?.currentLessonId ?? null)
+    : "/onboarding";
 
   if (loading) {
     return (
@@ -247,7 +252,7 @@ export default function LearnPage() {
                   </div>
                 </div>
 
-                <Link href={currentProgress?.currentLessonId ? `/lessons/${currentProgress.currentLessonId}` : "/onboarding"}>
+                <Link href={currentProjectHref}>
                   <Button className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-full px-8 shadow-lg shadow-cyan-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-200/40 hover:-translate-y-0.5">
                     <Play className="w-4 h-4 mr-2" />
                     继续学习第 {currentProgress?.completedLessons ? currentProgress.completedLessons + 1 : 8} 章
@@ -369,7 +374,7 @@ export default function LearnPage() {
                         </>
                       )}
 
-                      <Link href={progress?.currentLessonId ? `/lessons/${progress.currentLessonId}` : `/materials/${project.id}`}>
+                      <Link href={getProjectHref(project.id, progress?.currentLessonId ?? null)}>
                         <Button className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 rounded-xl shadow-md shadow-cyan-200/50 transition-all duration-300 hover:shadow-lg">
                           <Play className="w-4 h-4 mr-2" />
                           {progress?.currentLessonId ? "继续学习" : "开始学习"}

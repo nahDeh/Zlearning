@@ -28,7 +28,6 @@ export async function POST(
     }
 
     const isCorrect = userAnswer === exercise.correctAnswer;
-
     const feedback = isCorrect
       ? "回答正确！" + (exercise.explanation ? ` ${exercise.explanation}` : "")
       : `回答错误。正确答案是：${exercise.correctAnswer}` +

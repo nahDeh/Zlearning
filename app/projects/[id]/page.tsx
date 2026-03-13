@@ -2,20 +2,29 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileUpload } from "@/components/upload/FileUpload";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  FileUpload,
+  type UploadedMaterial,
+} from "@/components/upload/FileUpload";
 import {
   ArrowLeft,
-  Loader2,
-  BookOpen,
-  Target,
-  Clock,
-  User,
-  Upload,
-  FileText,
   ArrowRight,
+  BookOpen,
+  Clock,
+  FileText,
+  Loader2,
+  Target,
+  Upload,
+  User,
 } from "lucide-react";
 
 interface ProjectData {
@@ -33,12 +42,15 @@ interface ProjectData {
       preferences?: string[];
     } | null;
   } | null;
-  materials?: Array<{
-    id: string;
-    filename: string;
-    fileType: string;
-    parseStatus: string;
-  }>;
+}
+
+interface MaterialListItem {
+  id: string;
+  filename: string;
+  fileType: string;
+  parseStatus: string;
+  chunkCount: number;
+  errorMessage?: string | null;
 }
 
 const levelLabels: Record<string, string> = {
@@ -47,6 +59,25 @@ const levelLabels: Record<string, string> = {
   advanced: "进阶学习",
 };
 
+const statusConfig: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+> = {
+  pending: { label: "等待处理", variant: "secondary" },
+  processing: { label: "解析中", variant: "default" },
+  completed: { label: "已解析", variant: "outline" },
+  failed: { label: "解析失败", variant: "destructive" },
+};
+
+function getStatusBadge(status: string) {
+  const config = statusConfig[status] || {
+    label: status,
+    variant: "secondary" as const,
+  };
+
+  return <Badge variant={config.variant}>{config.label}</Badge>;
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -54,20 +85,10 @@ export default function ProjectPage() {
 
   const [project, setProject] = React.useState<ProjectData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [materials, setMaterials] = React.useState<Array<{
-    id: string;
-    filename: string;
-    fileType: string;
-    parseStatus: string;
-    chunkCount: number;
-  }>>([]);
+  const [materials, setMaterials] = React.useState<MaterialListItem[]>([]);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    fetchProject();
-    fetchMaterials();
-  }, [projectId]);
-
-  async function fetchProject() {
+  const fetchProject = React.useCallback(async () => {
     try {
       const response = await fetch(`/api/projects/${projectId}`);
       if (response.ok) {
@@ -79,9 +100,9 @@ export default function ProjectPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
-  async function fetchMaterials() {
+  const fetchMaterials = React.useCallback(async () => {
     try {
       const response = await fetch(`/api/materials/upload?projectId=${projectId}`);
       if (response.ok) {
@@ -91,24 +112,26 @@ export default function ProjectPage() {
     } catch (error) {
       console.error("Failed to fetch materials:", error);
     }
+  }, [projectId]);
+
+  React.useEffect(() => {
+    void fetchProject();
+    void fetchMaterials();
+  }, [fetchMaterials, fetchProject]);
+
+  function handleUploadSuccess(_material: UploadedMaterial) {
+    setUploadError(null);
+    void fetchMaterials();
   }
 
-  function handleUploadSuccess(material: { id: string; filename: string }) {
-    setMaterials((prev) => [
-      {
-        id: material.id,
-        filename: material.filename,
-        fileType: "txt",
-        parseStatus: "completed",
-        chunkCount: 0,
-      },
-      ...prev,
-    ]);
+  function handleUploadError(error: string) {
+    setUploadError(error);
+    void fetchMaterials();
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -116,10 +139,10 @@ export default function ProjectPage() {
 
   if (!project) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground mb-4">项目不存在</p>
+            <p className="mb-4 text-muted-foreground">项目不存在</p>
             <Button onClick={() => router.push("/learn")}>返回学习中心</Button>
           </CardContent>
         </Card>
@@ -131,8 +154,8 @@ export default function ProjectPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container max-w-5xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur-sm">
+        <div className="container mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => router.push("/learn")}>
               <ArrowLeft className="h-5 w-5" />
@@ -145,7 +168,7 @@ export default function ProjectPage() {
         </div>
       </header>
 
-      <main className="container max-w-5xl mx-auto px-4 py-8">
+      <main className="container mx-auto max-w-5xl px-4 py-8">
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1">
             <Card className="glass">
@@ -156,7 +179,7 @@ export default function ProjectPage() {
                 {project.profile && (
                   <>
                     <div className="flex items-start gap-3">
-                      <BookOpen className="h-5 w-5 text-primary mt-0.5" />
+                      <BookOpen className="mt-0.5 h-5 w-5 text-primary" />
                       <div>
                         <p className="text-sm text-muted-foreground">学习主题</p>
                         <p className="font-medium">{project.profile.topic}</p>
@@ -164,25 +187,26 @@ export default function ProjectPage() {
                     </div>
 
                     <div className="flex items-start gap-3">
-                      <Target className="h-5 w-5 text-primary mt-0.5" />
+                      <Target className="mt-0.5 h-5 w-5 text-primary" />
                       <div>
                         <p className="text-sm text-muted-foreground">学习目标</p>
-                        <p className="font-medium text-sm">{project.profile.goal}</p>
+                        <p className="text-sm font-medium">{project.profile.goal}</p>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-3">
-                      <User className="h-5 w-5 text-primary mt-0.5" />
+                      <User className="mt-0.5 h-5 w-5 text-primary" />
                       <div>
                         <p className="text-sm text-muted-foreground">当前水平</p>
                         <Badge variant="secondary">
-                          {levelLabels[project.profile.currentLevel] || project.profile.currentLevel}
+                          {levelLabels[project.profile.currentLevel] ||
+                            project.profile.currentLevel}
                         </Badge>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-3">
-                      <Clock className="h-5 w-5 text-primary mt-0.5" />
+                      <Clock className="mt-0.5 h-5 w-5 text-primary" />
                       <div>
                         <p className="text-sm text-muted-foreground">每周学习时间</p>
                         <p className="font-medium">约 {project.profile.timeBudget} 小时</p>
@@ -194,26 +218,36 @@ export default function ProjectPage() {
             </Card>
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6 lg:col-span-2">
             <Card className="glass">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
                   <Upload className="h-5 w-5" />
                   上传学习资料
                 </CardTitle>
                 <CardDescription>
-                  上传你的学习资料（支持 TXT、MD 格式），系统将自动解析并生成学习大纲
+                  上传 TXT、MD、PDF 或 EPUB 文件，系统会自动解析内容并生成后续学习资料。
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <FileUpload projectId={projectId} onUploadComplete={handleUploadSuccess} />
+              <CardContent className="space-y-4">
+                {uploadError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                    {uploadError}
+                  </div>
+                )}
+
+                <FileUpload
+                  projectId={projectId}
+                  onUploadComplete={handleUploadSuccess}
+                  onUploadError={handleUploadError}
+                />
               </CardContent>
             </Card>
 
             {hasMaterials && (
               <Card className="glass">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
                     <FileText className="h-5 w-5" />
                     已上传资料
                   </CardTitle>
@@ -223,19 +257,28 @@ export default function ProjectPage() {
                     {materials.map((material) => (
                       <div
                         key={material.id}
-                        className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary/30 transition-colors cursor-pointer"
+                        className="cursor-pointer rounded-xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/30"
                         onClick={() => router.push(`/materials/${material.id}`)}
                       >
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-primary" />
-                          <div>
-                            <p className="font-medium">{material.filename}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {material.parseStatus === "completed" ? "已解析" : "解析中..."}
-                            </p>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <FileText className="mt-0.5 h-5 w-5 text-primary" />
+                            <div className="space-y-1">
+                              <p className="font-medium">{material.filename}</p>
+                              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                <span className="uppercase">{material.fileType}</span>
+                                <span>· {material.chunkCount} 个分块</span>
+                                {getStatusBadge(material.parseStatus)}
+                              </div>
+                              {material.errorMessage && (
+                                <p className="text-sm text-destructive">
+                                  {material.errorMessage}
+                                </p>
+                              )}
+                            </div>
                           </div>
+                          <ArrowRight className="h-5 w-5 text-muted-foreground" />
                         </div>
-                        <ArrowRight className="h-5 w-5 text-muted-foreground" />
                       </div>
                     ))}
                   </div>

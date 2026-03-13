@@ -20,9 +20,11 @@ export async function GET(request: NextRequest) {
       include: {
         outlines: {
           where: { isActive: true },
+          orderBy: { version: "desc" },
           include: {
             lessons: {
               select: { id: true },
+              orderBy: { orderIndex: "asc" },
             },
           },
         },
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     const activeOutline = project.outlines[0];
     const totalLessons = activeOutline?.lessons.length || 0;
-    const lessonIds = activeOutline?.lessons.map((l) => l.id) || [];
+    const lessonIds = activeOutline?.lessons.map((lesson) => lesson.id) || [];
 
     const completedRecords = await prisma.studyRecord.findMany({
       where: {
@@ -53,8 +55,25 @@ export async function GET(request: NextRequest) {
     });
 
     const completedLessons = completedRecords.length;
-    const totalStudyTime = allRecords.reduce((sum, r) => sum + r.studyTime, 0);
-    const completionRate = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    const totalStudyTime = allRecords.reduce((sum, record) => sum + record.studyTime, 0);
+    const completionRate =
+      totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    const completedLessonIds = new Set(completedRecords.map((record) => record.lessonId));
+
+    let currentLessonId = project.currentLessonId;
+    if (currentLessonId && !lessonIds.includes(currentLessonId)) {
+      currentLessonId = null;
+      await prisma.learningProject.update({
+        where: { id: projectId },
+        data: { currentLessonId: null },
+      });
+    }
+
+    const resumeLessonId =
+      currentLessonId ??
+      activeOutline?.lessons.find((lesson) => !completedLessonIds.has(lesson.id))?.id ??
+      activeOutline?.lessons[0]?.id ??
+      null;
 
     return NextResponse.json({
       projectId,
@@ -62,7 +81,7 @@ export async function GET(request: NextRequest) {
       completedLessons,
       completionRate,
       totalStudyTime,
-      currentLessonId: project.currentLessonId,
+      currentLessonId: resumeLessonId,
     });
   } catch (error) {
     console.error("Error fetching progress:", error);
@@ -89,13 +108,31 @@ export async function POST(request: NextRequest) {
       where: { id: lessonId },
       include: {
         outline: {
-          select: { projectId: true },
+          select: { id: true, projectId: true },
         },
       },
     });
 
     if (!lesson) {
       return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+    }
+
+    if (projectId) {
+      const project = await prisma.learningProject.findUnique({
+        where: { id: projectId },
+        select: { id: true },
+      });
+
+      if (!project) {
+        return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+      }
+
+      if (lesson.outline.projectId !== projectId) {
+        return NextResponse.json(
+          { error: "该章节不属于当前项目" },
+          { status: 400 }
+        );
+      }
     }
 
     const existingRecord = await prisma.studyRecord.findUnique({
@@ -133,11 +170,27 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (projectId && status === "completed") {
-      await prisma.learningProject.update({
-        where: { id: projectId },
-        data: { currentLessonId: lessonId },
-      });
+    if (projectId) {
+      if (status === "completed") {
+        const orderedLessons = await prisma.lesson.findMany({
+          where: { outlineId: lesson.outlineId },
+          select: { id: true },
+          orderBy: { orderIndex: "asc" },
+        });
+        const currentLessonIndex = orderedLessons.findIndex((item) => item.id === lessonId);
+        const nextLessonId =
+          currentLessonIndex >= 0 ? orderedLessons[currentLessonIndex + 1]?.id ?? null : null;
+
+        await prisma.learningProject.update({
+          where: { id: projectId },
+          data: { currentLessonId: nextLessonId },
+        });
+      } else if (status === "in_progress") {
+        await prisma.learningProject.update({
+          where: { id: projectId },
+          data: { currentLessonId: lessonId },
+        });
+      }
     }
 
     return NextResponse.json({
