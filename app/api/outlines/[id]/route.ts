@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OutlineChapter } from "@/types/outline";
+import { Prisma } from "@prisma/client";
+
+function parseOutlineContent(content: unknown): OutlineChapter[] {
+  return content as unknown as OutlineChapter[];
+}
 
 export async function GET(
   request: NextRequest,
@@ -17,9 +22,6 @@ export async function GET(
             profile: true,
           },
         },
-        lessons: {
-          orderBy: { orderIndex: "asc" },
-        },
       },
     });
 
@@ -28,24 +30,19 @@ export async function GET(
     }
 
     return NextResponse.json({
-      id: outline.id,
-      projectId: outline.projectId,
-      version: outline.version,
-      content: outline.content as OutlineChapter[],
-      isActive: outline.isActive,
-      createdAt: outline.createdAt,
-      lessons: outline.lessons.map((lesson) => ({
-        id: lesson.id,
-        title: lesson.title,
-        orderIndex: lesson.orderIndex,
-        objective: lesson.objective,
-        estimatedMinutes: lesson.estimatedMinutes,
-        content: lesson.content,
-      })),
-      project: {
-        id: outline.project.id,
-        title: outline.project.title,
-        profile: outline.project.profile,
+      success: true,
+      outline: {
+        id: outline.id,
+        projectId: outline.projectId,
+        version: outline.version,
+        content: parseOutlineContent(outline.content),
+        isActive: outline.isActive,
+        createdAt: outline.createdAt,
+        project: {
+          id: outline.project.id,
+          title: outline.project.title,
+          profile: outline.project.profile,
+        },
       },
     });
   } catch (error) {
@@ -81,7 +78,7 @@ export async function PUT(
     const outline = await prisma.outline.update({
       where: { id },
       data: {
-        content: validatedChapters,
+        content: validatedChapters as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -91,7 +88,7 @@ export async function PUT(
         id: outline.id,
         projectId: outline.projectId,
         version: outline.version,
-        content: outline.content as OutlineChapter[],
+        content: parseOutlineContent(outline.content),
         isActive: outline.isActive,
         createdAt: outline.createdAt,
       },

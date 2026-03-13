@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OutlineChapter, Difficulty } from "@/types/outline";
+import { Prisma } from "@prisma/client";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 function isMockMode(): boolean {
   return !OPENAI_API_KEY || OPENAI_API_KEY === "";
+}
+
+function parseOutlineContent(content: unknown): OutlineChapter[] {
+  return content as unknown as OutlineChapter[];
 }
 
 async function generateOutlineWithAI(
@@ -184,7 +189,7 @@ export async function POST(
         success: true,
         outline: {
           id: existingOutline.id,
-          chapters: existingOutline.content as OutlineChapter[],
+          chapters: parseOutlineContent(existingOutline.content),
           version: existingOutline.version,
         },
       });
@@ -213,7 +218,7 @@ export async function POST(
       data: {
         projectId: material.projectId,
         version: newVersion,
-        content: chapters,
+        content: chapters as unknown as Prisma.InputJsonValue,
         isActive: true,
       },
     });
