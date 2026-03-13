@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import { pathToFileURL } from "url";
 
 export type SupportedFileType = "txt" | "md" | "pdf" | "epub";
 
@@ -17,7 +16,54 @@ export interface ParseResult {
   };
 }
 
-export async function parseFile(filePath: string, fileType: SupportedFileType): Promise<ParseResult> {
+interface PdfJsTextItem {
+  str: string;
+  transform: number[];
+  hasEOL?: boolean;
+}
+
+interface PdfJsTextContent {
+  items: Array<PdfJsTextItem | { str?: never }>;
+}
+
+interface PdfJsPage {
+  getTextContent(): Promise<PdfJsTextContent>;
+  cleanup(): void;
+}
+
+interface PdfJsMetadata {
+  info?: {
+    Title?: string;
+    Author?: string;
+  };
+}
+
+interface PdfJsDocument {
+  numPages: number;
+  getMetadata(): Promise<PdfJsMetadata>;
+  getPage(pageNumber: number): Promise<PdfJsPage>;
+  destroy(): Promise<void>;
+}
+
+interface PdfJsLoadingTask {
+  promise: Promise<PdfJsDocument>;
+  destroy(): Promise<void>;
+}
+
+interface PdfJsModule {
+  getDocument(options: {
+    data: Uint8Array;
+    useWorkerFetch?: boolean;
+    isOffscreenCanvasSupported?: boolean;
+    isImageDecoderSupported?: boolean;
+    disableFontFace?: boolean;
+  }): PdfJsLoadingTask;
+}
+
+export async function parseFile(
+  filePath: string,
+  fileType: SupportedFileType
+): Promise<ParseResult> {
   try {
     if (!fs.existsSync(filePath)) {
       return {
@@ -82,76 +128,46 @@ function parseMdFile(filePath: string): ParseResult {
   };
 }
 
-interface LegacyPdfParseResult {
-  text: string;
-  numpages?: number;
-  info?: {
-    Title?: string;
-    Author?: string;
-  };
-}
+function extractTextFromPdfItems(items: PdfJsTextContent["items"]): string {
+  const parts: string[] = [];
+  let previousY: number | null = null;
 
-interface PdfParseV2TextResult {
-  text: string;
-  total: number;
-}
+  for (const item of items) {
+    if (!("str" in item) || typeof item.str !== "string") {
+      continue;
+    }
 
-interface PdfParseV2InfoResult {
-  total: number;
-  info?: {
-    Title?: string;
-    Author?: string;
-  };
-}
+    const currentY =
+      Array.isArray(item.transform) && item.transform.length > 5
+        ? item.transform[5]
+        : null;
 
-interface PdfParseV2Instance {
-  getText(): Promise<PdfParseV2TextResult>;
-  getInfo(): Promise<PdfParseV2InfoResult>;
-  destroy(): Promise<void>;
-}
+    if (parts.length > 0) {
+      if (
+        currentY !== null &&
+        previousY !== null &&
+        Math.abs(currentY - previousY) > 2
+      ) {
+        parts.push("\n");
+      } else if (!parts[parts.length - 1]?.endsWith("\n")) {
+        parts.push(" ");
+      }
+    }
 
-interface PdfParseV2Constructor {
-  new (options: { data: Buffer }): PdfParseV2Instance;
-  setWorker(workerPath?: string): string;
-}
+    parts.push(item.str);
 
-type LegacyPdfParseFunction = (dataBuffer: Buffer) => Promise<LegacyPdfParseResult>;
+    if (item.hasEOL) {
+      parts.push("\n");
+    }
 
-type PdfParseModule =
-  | LegacyPdfParseFunction
-  | {
-      default?: LegacyPdfParseFunction;
-      PDFParse?: PdfParseV2Constructor;
-    };
-
-let hasConfiguredPdfWorker = false;
-
-function configurePdfWorker(PDFParse: PdfParseV2Constructor) {
-  if (hasConfiguredPdfWorker) {
-    return;
+    previousY = currentY;
   }
 
-  const currentWorker = PDFParse.setWorker();
-  if (currentWorker && currentWorker !== "./pdf.worker.mjs") {
-    hasConfiguredPdfWorker = true;
-    return;
-  }
-
-  const workerPath = path.resolve(
-    process.cwd(),
-    "node_modules",
-    "pdfjs-dist",
-    "build",
-    "pdf.worker.mjs"
-  );
-
-  if (!fs.existsSync(workerPath)) {
-    hasConfiguredPdfWorker = true;
-    return;
-  }
-
-  PDFParse.setWorker(pathToFileURL(workerPath).href);
-  hasConfiguredPdfWorker = true;
+  return parts
+    .join("")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function extractPdfData(dataBuffer: Buffer): Promise<{
@@ -160,53 +176,53 @@ async function extractPdfData(dataBuffer: Buffer): Promise<{
   title?: string;
   author?: string;
 }> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParseModule = require("pdf-parse") as PdfParseModule;
+  const pdfjs = (await import(
+    "pdfjs-dist/legacy/build/pdf.mjs"
+  )) as PdfJsModule;
 
-  if (
-    typeof pdfParseModule === "object" &&
-    pdfParseModule !== null &&
-    typeof pdfParseModule.PDFParse === "function"
-  ) {
-    configurePdfWorker(pdfParseModule.PDFParse);
-    const parser = new pdfParseModule.PDFParse({ data: dataBuffer });
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(dataBuffer),
+    useWorkerFetch: false,
+    isOffscreenCanvasSupported: false,
+    isImageDecoderSupported: false,
+    disableFontFace: true,
+  });
 
-    try {
-      const textResult = await parser.getText();
-      const infoResult = await parser.getInfo();
+  let document: PdfJsDocument | null = null;
 
-      return {
-        text: textResult.text,
-        pageCount: infoResult.total || textResult.total,
-        title: infoResult.info?.Title || undefined,
-        author: infoResult.info?.Author || undefined,
-      };
-    } finally {
-      await parser.destroy();
+  try {
+    document = await loadingTask.promise;
+    const metadata = await document.getMetadata();
+    const pageTexts: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber++) {
+      const page = await document.getPage(pageNumber);
+
+      try {
+        const textContent = await page.getTextContent();
+        const pageText = extractTextFromPdfItems(textContent.items);
+
+        if (pageText) {
+          pageTexts.push(pageText);
+        }
+      } finally {
+        page.cleanup();
+      }
+    }
+
+    return {
+      text: pageTexts.join("\n\n").trim(),
+      pageCount: document.numPages,
+      title: metadata.info?.Title || undefined,
+      author: metadata.info?.Author || undefined,
+    };
+  } finally {
+    if (document) {
+      await document.destroy();
+    } else {
+      await loadingTask.destroy();
     }
   }
-
-  const legacyParser =
-    typeof pdfParseModule === "function"
-      ? pdfParseModule
-      : typeof pdfParseModule === "object" &&
-          pdfParseModule !== null &&
-          typeof pdfParseModule.default === "function"
-        ? pdfParseModule.default
-        : null;
-
-  if (!legacyParser) {
-    throw new Error("当前 pdf-parse 导出格式不受支持");
-  }
-
-  const legacyResult = await legacyParser(dataBuffer);
-
-  return {
-    text: legacyResult.text,
-    pageCount: legacyResult.numpages,
-    title: legacyResult.info?.Title || undefined,
-    author: legacyResult.info?.Author || undefined,
-  };
 }
 
 async function parsePdfFile(filePath: string): Promise<ParseResult> {
@@ -233,7 +249,9 @@ async function parsePdfFile(filePath: string): Promise<ParseResult> {
     return {
       success: false,
       text: "",
-      error: `PDF 解析失败: ${error instanceof Error ? error.message : "未知错误"}`,
+      error: `PDF 解析失败: ${
+        error instanceof Error ? error.message : "未知错误"
+      }`,
     };
   }
 }
@@ -285,7 +303,7 @@ async function parseEpubFile(filePath: string): Promise<ParseResult> {
           });
         };
 
-        processChapters();
+        void processChapters();
       });
 
       epub.on("error", (err: Error) => {
@@ -302,7 +320,9 @@ async function parseEpubFile(filePath: string): Promise<ParseResult> {
     return {
       success: false,
       text: "",
-      error: `EPUB 解析失败: ${error instanceof Error ? error.message : "未知错误"}`,
+      error: `EPUB 解析失败: ${
+        error instanceof Error ? error.message : "未知错误"
+      }`,
     };
   }
 }
@@ -329,8 +349,7 @@ function countWords(text: string): number {
 }
 
 export function getFileExtension(filename: string): string {
-  const ext = path.extname(filename).toLowerCase().slice(1);
-  return ext;
+  return path.extname(filename).toLowerCase().slice(1);
 }
 
 export function isValidFileType(filename: string): boolean {
