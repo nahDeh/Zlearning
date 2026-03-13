@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects        LearningProject[]
+  studyRecords    StudyRecord[]
+  exerciseAttempts ExerciseAttempt[]
+
+  @@map("users")
+}
+
+model LearningProject {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  status          String   @default("active")
+  currentLessonId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile  LearningProfile?
+  materials Material[]
+  outlines Outline[]
+
+  @@index([userId])
+  @@map("learning_projects")
+}
+
+model LearningProfile {
+  id            String   @id @default(cuid())
+  projectId     String   @unique
+  topic         String
+  goal          String   @db.Text
+  currentLevel  String
+  timeBudget    Int
+  learningStyle String?
+  preferences   Json?
+  createdAt     DateTime @default(now())
+
+  project LearningProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("learning_profiles")
+}
+
+model Material {
+  id            String   @id @default(cuid())
+  projectId     String
+  filename      String
+  fileType      String
+  filePath      String
+  fileSize      Int
+  parseStatus   String   @default("pending")
+  extractedText String?  @db.Text
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  project LearningProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  chunks  MaterialChunk[]
+
+  @@index([projectId])
+  @@map("materials")
+}
+
+model MaterialChunk {
+  id         String   @id @default(cuid())
+  materialId String
+  chunkText  String   @db.Text
+  chunkIndex Int
+  embedding  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@map("material_chunks")
+}
+
+model Outline {
+  id        String   @id @default(cuid())
+  projectId String
+  version   Int      @default(1)
+  content   Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  project LearningProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([projectId])
+  @@map("outlines")
+}
+
+model Lesson {
+  id               String   @id @default(cuid())
+  outlineId        String
+  title            String
+  orderIndex       Int
+  objective        String[]
+  prerequisites    String[]
+  content          String?  @db.Text
+  examples         Json?
+  summary          String?  @db.Text
+  estimatedMinutes Int?
+  createdAt        DateTime @default(now())
+
+  outline      Outline          @relation(fields: [outlineId], references: [id], onDelete: Cascade)
+  exercises    Exercise[]
+  studyRecords StudyRecord[]
+
+  @@index([outlineId])
+  @@map("lessons")
+}
+
+model Exercise {
+  id            String   @id @default(cuid())
+  lessonId      String
+  type          String
+  question      String   @db.Text
+  options       Json?
+  correctAnswer String   @db.Text
+  explanation   String?  @db.Text
+  difficulty    String?
+  createdAt     DateTime @default(now())
+
+  lesson   Lesson            @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attempts ExerciseAttempt[]
+
+  @@index([lessonId])
+  @@map("exercises")
+}
+
+model StudyRecord {
+  id          String    @id @default(cuid())
+  userId      String
+  lessonId    String
+  status      String    @default("in_progress")
+  studyTime   Int       @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("study_records")
+}
+
+model ExerciseAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  exerciseId  String
+  userAnswer  String   @db.Text
+  isCorrect   Boolean
+  feedback    String?  @db.Text
+  attemptedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([exerciseId])
+  @@map("exercise_attempts")
+}
