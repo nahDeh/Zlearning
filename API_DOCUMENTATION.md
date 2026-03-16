@@ -3,8 +3,9 @@
 ## 基础信息
 
 - **Base URL**: `http://localhost:3000/api`
-- **Content-Type**: `application/json`
+- **Content-Type**: `application/json`（文件上传接口为 `multipart/form-data`）
 - **认证方式**: 当前版本使用默认用户（无认证）
+- **Mock 模式**: 未配置 `AI_API_KEY` 时，AI 相关接口返回模拟数据
 
 ***
 
@@ -79,21 +80,20 @@ GET /api/projects
 }
 ```
 
-### POST /api/projects
+### GET /api/projects/:id
 
-创建新的学习项目。
+获取单个学习项目详情（包含学习画像与资料概览）。
 
-**请求体**:
+**路径参数**:
 
-```json
-{
-  "title": "Python 入门学习",
-  "topic": "Python 编程",
-  "goal": "掌握 Python 基础语法，能够编写简单程序",
-  "currentLevel": "beginner",
-  "timeBudget": 10,
-  "learningStyle": "practical"
-}
+| 参数 | 类型     | 说明    |
+| -- | ------ | ----- |
+| id | string | 项目 ID |
+
+**请求示例**:
+
+```bash
+GET /api/projects/clx123...
 ```
 
 **响应示例**:
@@ -104,32 +104,48 @@ GET /api/projects
   "project": {
     "id": "clx123...",
     "title": "Python 入门学习",
-    "status": "active"
-  },
-  "profile": {
-    "id": "clx456...",
-    "topic": "Python 编程",
-    "goal": "掌握 Python 基础语法，能够编写简单程序",
-    "currentLevel": "beginner",
-    "timeBudget": 10,
-    "learningStyle": "practical"
+    "status": "active",
+    "profile": {
+      "topic": "Python",
+      "goal": "掌握 Python 基础语法",
+      "currentLevel": "beginner",
+      "timeBudget": 4,
+      "learningStyle": "mixed",
+      "preferences": {
+        "background": "",
+        "preferences": []
+      }
+    },
+    "materials": [
+      {
+        "id": "clx789...",
+        "filename": "learning.pdf",
+        "fileType": "pdf",
+        "parseStatus": "completed"
+      }
+    ]
   }
 }
 ```
 
-***
+### POST /api/projects
 
-## 3. 学习画像问答
-
-### POST /api/questionnaire/start
-
-开始学习画像问答会话。
+创建新的学习项目。
 
 **请求体**:
 
 ```json
 {
-  "projectId": "clx123..."
+  "title": "Python 入门学习",
+  "profile": {
+    "topic": "Python 编程",
+    "goal": "掌握 Python 基础语法，能够编写简单程序",
+    "currentLevel": "beginner",
+    "timeBudget": 10,
+    "learningStyle": "practical",
+    "background": "有一点编程基础",
+    "preferences": ["项目驱动", "例子多一些"]
+  }
 }
 ```
 
@@ -138,15 +154,46 @@ GET /api/projects
 ```json
 {
   "success": true,
-  "question": {
-    "id": "q1",
-    "text": "你想学习什么主题？例如：Python、JavaScript、数据分析等",
-    "type": "text",
-    "field": "topic"
-  },
-  "progress": {
-    "current": 1,
-    "total": 6
+  "projectId": "clx123...",
+  "project": {
+    "id": "clx123...",
+    "title": "Python 入门学习",
+    "status": "active",
+    "profile": {
+      "topic": "Python 编程",
+      "goal": "掌握 Python 基础语法，能够编写简单程序",
+      "currentLevel": "beginner",
+      "timeBudget": 10,
+      "learningStyle": "practical",
+      "preferences": {
+        "background": "有一点编程基础",
+        "preferences": ["项目驱动", "例子多一些"]
+      }
+    }
+  }
+}
+```
+
+***
+
+## 3. 学习画像问答
+
+> 说明：该组接口用于生成“学习画像草稿”。如需落库并创建项目，请调用 `POST /api/projects`。
+
+### GET /api/questionnaire/start
+
+开始学习画像问答会话。
+
+**响应示例**:
+
+```json
+{
+  "success": true,
+  "firstQuestion": {
+    "id": "topic",
+    "role": "assistant",
+    "content": "你好！我是你的 AI 学习助手。首先，请告诉我你想学习什么主题？",
+    "timestamp": "2026-03-16T00:00:00.000Z"
   }
 }
 ```
@@ -159,8 +206,7 @@ GET /api/projects
 
 ```json
 {
-  "projectId": "clx123...",
-  "questionId": "q1",
+  "questionId": "topic",
   "answer": "Python 编程"
 }
 ```
@@ -171,14 +217,10 @@ GET /api/projects
 {
   "success": true,
   "nextQuestion": {
-    "id": "q2",
-    "text": "你的学习目标是什么？",
-    "type": "text",
-    "field": "goal"
-  },
-  "progress": {
-    "current": 2,
-    "total": 6
+    "id": "goal",
+    "role": "assistant",
+    "content": "很好！那么你学习这个主题的具体目标是什么呢？比如是为了工作需要、个人兴趣、还是准备考试？",
+    "timestamp": "2026-03-16T00:00:00.000Z"
   },
   "isComplete": false
 }
@@ -192,7 +234,14 @@ GET /api/projects
 
 ```json
 {
-  "projectId": "clx123..."
+  "answers": {
+    "topic": "Python 编程",
+    "goal": "掌握 Python 基础语法",
+    "currentLevel": "beginner",
+    "timeBudget": "4",
+    "learningStyle": "practical",
+    "background": "我是产品经理，想提升自动化能力"
+  }
 }
 ```
 
@@ -202,14 +251,13 @@ GET /api/projects
 {
   "success": true,
   "profile": {
-    "id": "clx456...",
-    "projectId": "clx123...",
     "topic": "Python 编程",
     "goal": "掌握基础语法，能够编写简单程序",
     "currentLevel": "beginner",
-    "timeBudget": 10,
+    "timeBudget": 4,
     "learningStyle": "practical",
-    "preferences": {}
+    "background": "你具备一定的业务背景，希望通过 Python 提升自动化效率。",
+    "preferences": ["项目驱动", "例子多一些"]
   }
 }
 ```
@@ -230,7 +278,7 @@ GET /api/projects
 
 | 字段        | 类型     | 必填 | 说明                   |
 | --------- | ------ | -- | -------------------- |
-| file      | File   | 是  | 上传的文件（支持 txt、md、pdf） |
+| file      | File   | 是  | 上传的文件（支持 txt、md、pdf、epub） |
 | projectId | string | 是  | 项目 ID                |
 
 **请求示例**:
@@ -253,8 +301,11 @@ curl -X POST http://localhost:3000/api/materials/upload \
     "fileSize": 1024,
     "parseStatus": "completed",
     "metadata": {
-      "totalChars": 5000,
-      "totalWords": 800
+      "wordCount": 800,
+      "charCount": 5000,
+      "pageCount": 12,
+      "title": "示例标题",
+      "author": "示例作者"
     },
     "chunkCount": 5
   }
@@ -583,7 +634,6 @@ GET /api/materials/upload?projectId=clx123...
       "选项 C：第三个选项",
       "选项 D：第四个选项"
     ],
-    "correctAnswer": "选项 B：第二个选项（正确答案）",
     "explanation": "这道题考察的是核心概念...",
     "difficulty": "easy"
   }
@@ -754,12 +804,12 @@ GET /api/progress?projectId=clx123...
 
 | 变量名               | 必填 | 说明                                           |
 | ----------------- | -- | -------------------------------------------- |
-| `DATABASE_URL`    | 是  | PostgreSQL 数据库连接字符串                          |
+| `DATABASE_URL`    | 是  | Prisma 数据库连接字符串（默认 SQLite；也可配置 PostgreSQL） |
 | `AI_API_BASE_URL` | 否  | AI API 基础 URL，默认 `https://api.openai.com/v1` |
 | `AI_API_KEY`      | 否  | AI API 密钥（不配置则使用 Mock 模式）                    |
 | `AI_MODEL`        | 否  | AI 模型名称，默认 `gpt-4o-mini`                     |
 | `UPLOAD_DIR`      | 否  | 文件上传目录，默认 `./uploads`                        |
-| `MAX_FILE_SIZE`   | 否  | 最大文件大小，默认 `10485760`（10MB）                   |
+| `MAX_FILE_SIZE`   | 否  | 最大文件大小，默认 `52428800`（50MB）                   |
 
 ### AI API 配置示例
 
@@ -778,4 +828,3 @@ AI_API_BASE_URL="https://api.siliconflow.cn/v1"
 AI_API_KEY="sk-..."
 AI_MODEL="Qwen/Qwen2.5-7B-Instruct"
 ```
-

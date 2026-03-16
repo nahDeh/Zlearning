@@ -5,7 +5,7 @@
 ## 功能特性
 
 - 🎯 **智能学习建档** - AI 结构化提问，生成个性化学习画像
-- 📄 **资料上传解析** - 支持 TXT/MD 文件，自动提取文本并分块
+- 📄 **资料上传解析** - 支持 TXT/MD/PDF/EPUB，自动提取文本并分块
 - 📚 **大纲自动生成** - 基于资料和学习画像生成结构化学习大纲
 - 📖 **课程内容生成** - AI 生成详细章节内容，包含目标、讲解、示例、总结
 - ✍️ **练习题生成** - 为每章节生成选择题，提供答案解析
@@ -16,7 +16,7 @@
 
 - **前端**: Next.js 14 + React 18 + TypeScript + Tailwind CSS + shadcn/ui
 - **后端**: Next.js API Routes + Prisma ORM
-- **数据库**: PostgreSQL + pgvector
+- **数据库**: SQLite（默认开发环境）/ PostgreSQL + pgvector（规划或可选）
 - **AI**: 支持多种 AI API（OpenAI、硅基流动等）
 
 ## 快速开始
@@ -39,12 +39,19 @@ cp .env.example .env
 
 ```bash
 # Database
-DATABASE_URL="postgresql://user:password@localhost:5432/zhixue"
+# 默认使用 SQLite（无需额外安装数据库）
+DATABASE_URL="file:./dev.db"
 
 # AI API Configuration
 AI_API_BASE_URL="https://api.openai.com/v1"
 AI_API_KEY="sk-..."
 AI_MODEL="gpt-4o-mini"
+```
+
+如需切换到 PostgreSQL（可选/规划），可将 `DATABASE_URL` 配置为：
+
+```bash
+DATABASE_URL="postgresql://user:password@localhost:5432/zhixue"
 ```
 
 ### 3. 配置 AI API
@@ -140,12 +147,12 @@ npm run lint
 
 | 变量名 | 必填 | 说明 |
 |--------|------|------|
-| `DATABASE_URL` | 是 | PostgreSQL 数据库连接字符串 |
+| `DATABASE_URL` | 是 | Prisma 数据库连接字符串（默认 SQLite；也可配置 PostgreSQL） |
 | `AI_API_BASE_URL` | 否 | AI API 基础 URL，默认 `https://api.openai.com/v1` |
 | `AI_API_KEY` | 否 | AI API 密钥（不配置则使用 Mock 模式） |
 | `AI_MODEL` | 否 | AI 模型名称，默认 `gpt-4o-mini` |
 | `UPLOAD_DIR` | 否 | 文件上传目录，默认 `./uploads` |
-| `MAX_FILE_SIZE` | 否 | 最大文件大小，默认 `10485760`（10MB） |
+| `MAX_FILE_SIZE` | 否 | 最大文件大小，默认 `52428800`（50MB） |
 | `NEXT_PUBLIC_APP_URL` | 否 | 应用 URL，默认 `http://localhost:3000` |
 
 ## 设计规范

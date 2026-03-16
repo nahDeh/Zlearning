@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,8 @@ import {
   Edit3,
   Loader2,
   BookOpen,
-  Sparkles
+  Sparkles,
+  Target
 } from "lucide-react";
 
 interface LessonData {
@@ -52,6 +53,13 @@ export default function LessonPage({ params }: PageProps) {
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("简介");
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [isMarkedComplete, setIsMarkedComplete] = useState(false);
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const studyStartedAtRef = useRef<number | null>(null);
+  const hasReportedStudyTimeRef = useRef(false);
+  const lessonIdForProgress = lesson?.id ?? null;
+  const projectIdForProgress = lesson?.outline.projectId ?? null;
 
   useEffect(() => {
     async function fetchData() {
@@ -66,6 +74,102 @@ export default function LessonPage({ params }: PageProps) {
     }
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (!lessonIdForProgress || !projectIdForProgress) {
+      return;
+    }
+
+    const lessonId = lessonIdForProgress;
+    const projectId = projectIdForProgress;
+    const startedAt = Date.now();
+
+    studyStartedAtRef.current = startedAt;
+    hasReportedStudyTimeRef.current = false;
+    setIsMarkedComplete(false);
+    setProgressError(null);
+
+    void fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lessonId,
+        projectId,
+        status: "in_progress",
+        studyTime: 0,
+      }),
+    }).catch((error) => {
+      console.warn("Failed to mark lesson in progress:", error);
+    });
+
+    return () => {
+      if (hasReportedStudyTimeRef.current) {
+        return;
+      }
+
+      const minutes = Math.max(0, Math.round((Date.now() - startedAt) / 60000));
+      if (minutes <= 0) {
+        return;
+      }
+
+      void fetch("/api/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId,
+          projectId,
+          studyTime: minutes,
+        }),
+        keepalive: true,
+      }).catch((error) => {
+        console.warn("Failed to report study time:", error);
+      });
+    };
+  }, [lessonIdForProgress, projectIdForProgress]);
+
+  const handleMarkMastered = async () => {
+    if (!lesson || isMarkingComplete || isMarkedComplete) {
+      return;
+    }
+
+    try {
+      setIsMarkingComplete(true);
+      setProgressError(null);
+
+      const now = Date.now();
+      const startedAt = studyStartedAtRef.current ?? now;
+      const minutes = Math.max(0, Math.round((now - startedAt) / 60000));
+
+      hasReportedStudyTimeRef.current = true;
+
+      const res = await fetch("/api/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lessonId: lesson.id,
+          projectId: lesson.outline.projectId,
+          status: "completed",
+          studyTime: minutes,
+        }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "标记完成失败");
+      }
+
+      setIsMarkedComplete(true);
+    } catch (error) {
+      hasReportedStudyTimeRef.current = false;
+      setProgressError(error instanceof Error ? error.message : "标记完成失败");
+    } finally {
+      setIsMarkingComplete(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -269,14 +373,28 @@ asyncio.run(main())`}</code>
 
           {/* 底部操作栏 */}
           <div className="flex items-center justify-between pt-6 border-t border-slate-700/50">
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 rounded-xl">
                 <Edit3 className="w-4 h-4 mr-2" />
                 记录笔记
               </Button>
-              <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl shadow-lg shadow-green-500/20">
-                <CheckCircle className="w-4 h-4 mr-2" />
-                我已掌握
+              <Link href={`/lessons/${lesson.id}/exercises`}>
+                <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 rounded-xl">
+                  <Target className="w-4 h-4 mr-2" />
+                  去做练习
+                </Button>
+              </Link>
+              <Button
+                onClick={() => void handleMarkMastered()}
+                disabled={isMarkingComplete || isMarkedComplete}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl shadow-lg shadow-green-500/20 disabled:opacity-60"
+              >
+                {isMarkingComplete ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                )}
+                {isMarkedComplete ? "已掌握" : "我已掌握"}
               </Button>
             </div>
 
@@ -299,6 +417,10 @@ asyncio.run(main())`}</code>
               )}
             </div>
           </div>
+
+          {progressError && (
+            <p className="mt-3 text-sm text-red-400">{progressError}</p>
+          )}
         </main>
 
         {/* 右侧课程进度 */}
