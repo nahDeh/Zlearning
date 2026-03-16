@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseJsonFromAi } from "@/services/ai-json";
 
 const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
 const AI_API_KEY = process.env.AI_API_KEY;
@@ -88,14 +89,37 @@ async function generateExercisesWithAI(
       return generateMockExercises(lessonTitle, count);
     }
 
-    const exercises = JSON.parse(content);
-    return exercises.map((e: GeneratedExercise) => ({
-      question: e.question || "",
-      options: e.options || [],
-      correctAnswer: e.correctAnswer || "",
-      explanation: e.explanation || "",
-      difficulty: e.difficulty || "medium",
-    }));
+    const parsed = parseJsonFromAi(content);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid exercises JSON");
+    }
+
+    return parsed.map((exercise) => {
+      const exerciseObj =
+      typeof exercise === "object" && exercise !== null && !Array.isArray(exercise)
+        ? (exercise as Record<string, unknown>)
+        : {};
+
+      return {
+        question:
+          typeof exerciseObj.question === "string" ? exerciseObj.question : "",
+        options: Array.isArray(exerciseObj.options)
+          ? (exerciseObj.options as string[])
+          : [],
+        correctAnswer:
+          typeof exerciseObj.correctAnswer === "string"
+            ? exerciseObj.correctAnswer
+            : "",
+        explanation:
+          typeof exerciseObj.explanation === "string"
+            ? exerciseObj.explanation
+            : "",
+        difficulty:
+          typeof exerciseObj.difficulty === "string"
+            ? exerciseObj.difficulty
+            : "medium",
+      };
+    });
   } catch (error) {
     console.error("Error generating exercises:", error);
     return generateMockExercises(lessonTitle, count);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,7 +50,7 @@ interface OutlineApiResponse {
 }
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 async function getOutlineData(outlineId: string): Promise<OutlineData | null> {
@@ -118,7 +118,7 @@ function getDifficultyText(difficulty: string): string {
 }
 
 export default function CoursePage({ params }: PageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const [outline, setOutline] = useState<OutlineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);

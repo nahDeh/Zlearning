@@ -53,6 +53,14 @@ interface MaterialListItem {
   errorMessage?: string | null;
 }
 
+interface GenerateOutlineResponse {
+  success?: boolean;
+  outline?: {
+    id: string;
+  };
+  error?: string;
+}
+
 const levelLabels: Record<string, string> = {
   beginner: "零基础入门",
   intermediate: "有一定基础",
@@ -87,6 +95,10 @@ export default function ProjectPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [materials, setMaterials] = React.useState<MaterialListItem[]>([]);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [outlineError, setOutlineError] = React.useState<string | null>(null);
+  const [outlineLoadingId, setOutlineLoadingId] = React.useState<string | null>(
+    null
+  );
 
   const fetchProject = React.useCallback(async () => {
     try {
@@ -121,6 +133,7 @@ export default function ProjectPage() {
 
   function handleUploadSuccess(_material: UploadedMaterial) {
     setUploadError(null);
+    setOutlineError(null);
     void fetchMaterials();
   }
 
@@ -128,6 +141,35 @@ export default function ProjectPage() {
     setUploadError(error);
     void fetchMaterials();
   }
+
+  const generateOutline = React.useCallback(
+    async (materialId: string) => {
+      try {
+        setOutlineLoadingId(materialId);
+        setOutlineError(null);
+
+        const response = await fetch(`/api/materials/${materialId}/outline`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ regenerate: false }),
+        });
+        const data = (await response.json()) as GenerateOutlineResponse;
+
+        if (!response.ok || !data.success || !data.outline?.id) {
+          throw new Error(data.error || "生成大纲失败");
+        }
+
+        router.push(`/outlines/${data.outline.id}`);
+      } catch (error) {
+        setOutlineError(
+          error instanceof Error ? error.message : "生成大纲失败，请稍后重试"
+        );
+      } finally {
+        setOutlineLoadingId(null);
+      }
+    },
+    [router]
+  );
 
   if (isLoading) {
     return (
@@ -151,6 +193,8 @@ export default function ProjectPage() {
   }
 
   const hasMaterials = materials.length > 0;
+  const latestCompletedMaterial =
+    materials.find((material) => material.parseStatus === "completed") || null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
@@ -253,6 +297,41 @@ export default function ProjectPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {outlineError && (
+                    <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                      {outlineError}
+                    </div>
+                  )}
+
+                  {latestCompletedMaterial && (
+                    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-slate-800">
+                          下一步：生成课程大纲
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          将基于最新解析完成的资料生成（或打开已生成的）学习大纲
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() =>
+                          void generateOutline(latestCompletedMaterial.id)
+                        }
+                        disabled={outlineLoadingId !== null}
+                        className="rounded-full bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-md shadow-cyan-200/50 hover:from-cyan-600 hover:to-cyan-700"
+                      >
+                        {outlineLoadingId === latestCompletedMaterial.id ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            生成中..
+                          </>
+                        ) : (
+                          "生成/查看大纲"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {materials.map((material) => (
                       <div
@@ -277,7 +356,27 @@ export default function ProjectPage() {
                               )}
                             </div>
                           </div>
-                          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                          <div className="flex items-center gap-2">
+                            {material.parseStatus === "completed" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={outlineLoadingId !== null}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void generateOutline(material.id);
+                                }}
+                                className="rounded-full"
+                              >
+                                {outlineLoadingId === material.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "大纲"
+                                )}
+                              </Button>
+                            )}
+                            <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                          </div>
                         </div>
                       </div>
                     ))}

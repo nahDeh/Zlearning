@@ -4,6 +4,7 @@ import {
   LearningProfileDraft,
   AnswerResponse,
 } from "@/types/questionnaire";
+import { parseJsonFromAi } from "@/services/ai-json";
 
 const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
 const AI_API_KEY = process.env.AI_API_KEY;
@@ -164,7 +165,7 @@ export async function generateLearningProfile(
       return generateMockProfile(answers);
     }
 
-    const profile = JSON.parse(content);
+    const profile = (parseJsonFromAi(content) as any) ?? {};
     return {
       topic: profile.topic || answers.topic || "未知主题",
       goal: profile.goal || answers.goal || "未设定目标",
@@ -252,7 +253,12 @@ export async function generateRecommendedBooks(
       return generateMockBooks(profile.topic);
     }
 
-    const books = JSON.parse(content);
+    const parsed = parseJsonFromAi(content);
+    if (!Array.isArray(parsed)) {
+      return generateMockBooks(profile.topic);
+    }
+
+    const books = parsed as RecommendedBook[];
     return books.map((book: RecommendedBook) => ({
       title: book.title || "未知书籍",
       author: book.author || "未知作者",

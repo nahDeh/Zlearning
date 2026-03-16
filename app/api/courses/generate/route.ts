@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseJsonFromAi } from "@/services/ai-json";
 
 const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
 const AI_API_KEY = process.env.AI_API_KEY;
@@ -128,16 +129,25 @@ Return JSON with:
       return generateMockLessonContent(chapterTitle, chapterDescription);
     }
 
-    const lessonContent = JSON.parse(content);
+    const lessonContent = parseJsonFromAi(content);
+    if (!lessonContent || typeof lessonContent !== "object" || Array.isArray(lessonContent)) {
+      throw new Error("Invalid lesson content JSON");
+    }
+
+    const lessonContentObj = lessonContent as Record<string, unknown>;
     return {
-      objective: Array.isArray(lessonContent.objective) ? lessonContent.objective : [],
-      prerequisites: Array.isArray(lessonContent.prerequisites)
-        ? lessonContent.prerequisites
+      objective: Array.isArray(lessonContentObj.objective)
+        ? (lessonContentObj.objective as string[])
         : [],
-      content: lessonContent.content || "",
-      examples: Array.isArray(lessonContent.examples) ? lessonContent.examples : [],
-      summary: lessonContent.summary || "",
-      estimatedMinutes: Number(lessonContent.estimatedMinutes) || 30,
+      prerequisites: Array.isArray(lessonContentObj.prerequisites)
+        ? (lessonContentObj.prerequisites as string[])
+        : [],
+      content: typeof lessonContentObj.content === "string" ? lessonContentObj.content : "",
+      examples: Array.isArray(lessonContentObj.examples)
+        ? (lessonContentObj.examples as LessonContent["examples"])
+        : [],
+      summary: typeof lessonContentObj.summary === "string" ? lessonContentObj.summary : "",
+      estimatedMinutes: Number(lessonContentObj.estimatedMinutes) || 30,
     };
   } catch (error) {
     console.error("Error generating lesson content:", error);

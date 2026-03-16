@@ -57,7 +57,29 @@ interface PdfJsModule {
     isOffscreenCanvasSupported?: boolean;
     isImageDecoderSupported?: boolean;
     disableFontFace?: boolean;
+    disableWorker?: boolean;
   }): PdfJsLoadingTask;
+}
+
+let cachedPdfJs: PdfJsModule | null = null;
+
+async function loadPdfJs(): Promise<PdfJsModule> {
+  if (cachedPdfJs) {
+    return cachedPdfJs;
+  }
+
+  // Next.js bundles server code with webpack; importing `pdfjs-dist` normally can break at runtime.
+  // This forces a native Node.js dynamic import at runtime (no webpack wrapping).
+  const dynamicImport = new Function(
+    "specifier",
+    "return import(specifier)"
+  ) as (specifier: string) => Promise<unknown>;
+
+  cachedPdfJs = (await dynamicImport(
+    "pdfjs-dist/legacy/build/pdf.mjs"
+  )) as PdfJsModule;
+
+  return cachedPdfJs;
 }
 
 export async function parseFile(
@@ -176,9 +198,7 @@ async function extractPdfData(dataBuffer: Buffer): Promise<{
   title?: string;
   author?: string;
 }> {
-  const pdfjs = (await import(
-    "pdfjs-dist/legacy/build/pdf.mjs"
-  )) as PdfJsModule;
+  const pdfjs = await loadPdfJs();
 
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(dataBuffer),
@@ -186,6 +206,7 @@ async function extractPdfData(dataBuffer: Buffer): Promise<{
     isOffscreenCanvasSupported: false,
     isImageDecoderSupported: false,
     disableFontFace: true,
+    disableWorker: true,
   });
 
   let document: PdfJsDocument | null = null;
@@ -246,6 +267,7 @@ async function parsePdfFile(filePath: string): Promise<ParseResult> {
       },
     };
   } catch (error) {
+    console.error("PDF parse error:", { filePath, error });
     return {
       success: false,
       text: "",

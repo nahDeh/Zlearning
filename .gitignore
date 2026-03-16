@@ -51,6 +51,8 @@ prisma/*.db-journal
 .trae/
 docs/
 UI图/
+uploads/
+1.py
 
 # OS
 *.log

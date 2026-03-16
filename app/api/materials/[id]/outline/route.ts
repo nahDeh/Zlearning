@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OutlineChapter, Difficulty } from "@/types/outline";
+import { parseJsonFromAi } from "@/services/ai-json";
 
 const AI_API_BASE_URL = process.env.AI_API_BASE_URL || "https://api.openai.com/v1";
 const AI_API_KEY = process.env.AI_API_KEY;
@@ -95,7 +96,12 @@ ${extractedText.slice(0, 4000)}
       return generateMockOutline();
     }
 
-    const chapters = JSON.parse(content);
+    const parsed = parseJsonFromAi(content);
+    if (!Array.isArray(parsed)) {
+      return generateMockOutline();
+    }
+
+    const chapters = parsed as Array<Partial<OutlineChapter>>;
     return chapters.map((chapter: Partial<OutlineChapter>, index: number) => ({
       title: chapter.title || `第 ${index + 1} 章`,
       description: chapter.description || "",
@@ -155,6 +161,13 @@ async function createOrReuseOutline(
   regenerate: boolean
 ) {
   return prisma.$transaction(async (tx) => {
+    // Acquire a write lock early (especially important for SQLite) to avoid
+    // concurrent requests computing the same next `version` and creating duplicates.
+    await tx.outline.updateMany({
+      where: { projectId, id: "__outline_lock__" },
+      data: { isActive: false },
+    });
+
     const activeOutline = await tx.outline.findFirst({
       where: { projectId, isActive: true },
       orderBy: { version: "desc" },

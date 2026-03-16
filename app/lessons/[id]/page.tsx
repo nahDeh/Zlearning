@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { markdownToHtml } from "@/lib/markdown";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -37,7 +38,7 @@ interface LessonData {
 }
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 async function getLessonData(lessonId: string): Promise<LessonData | null> {
@@ -47,7 +48,7 @@ async function getLessonData(lessonId: string): Promise<LessonData | null> {
 }
 
 export default function LessonPage({ params }: PageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("简介");
@@ -226,7 +227,9 @@ asyncio.run(main())`}</code>
           {/* 实际课程内容 */}
           {lesson.content && (
             <div className="prose prose-invert max-w-none mb-8">
-              <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+              <div
+                dangerouslySetInnerHTML={{ __html: markdownToHtml(lesson.content) }}
+              />
             </div>
           )}
 

@@ -17,6 +17,8 @@ import {
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
+export const runtime = "nodejs";
+
 function ensureDir(dirPath: string) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
