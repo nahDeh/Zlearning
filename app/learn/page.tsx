@@ -16,7 +16,8 @@ import {
   Trophy,
   Bell,
   Bookmark,
-  Flame
+  Flame,
+  Trash2
 } from "lucide-react";
 
 interface LearningProject {
@@ -126,6 +127,10 @@ export default function LearnPage() {
   const [projects, setProjects] = useState<LearningProject[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, StudyProgress>>({});
   const [loading, setLoading] = useState(true);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deleteProjectError, setDeleteProjectError] = useState<string | null>(
+    null
+  );
   const getProjectHref = (projectId: string, currentLessonId: string | null) =>
     currentLessonId ? `/lessons/${currentLessonId}` : `/projects/${projectId}`;
 
@@ -156,6 +161,43 @@ export default function LearnPage() {
     }
     fetchData();
   }, []);
+
+  const handleDeleteProject = async (projectId: string) => {
+    const confirmed = window.confirm(
+      "确定删除该项目吗？删除后该项目的资料、课程与学习记录都会被移除。"
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingProjectId(projectId);
+      setDeleteProjectError(null);
+
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "删除项目失败");
+      }
+
+      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+      setProgressMap((prev) => {
+        const next = { ...prev };
+        delete next[projectId];
+        return next;
+      });
+    } catch (error) {
+      setDeleteProjectError(
+        error instanceof Error ? error.message : "删除项目失败，请稍后重试"
+      );
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
 
   const currentProject = projects[0];
   const currentProgress = currentProject ? progressMap[currentProject.id] : null;
@@ -193,7 +235,7 @@ export default function LearnPage() {
               <span className="text-sm font-medium">知识等级：Level 4</span>
             </div>
           </div>
-          <button className="flex items-center gap-2 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors">
+          <button className="flex items-center gap-2 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
             <Bell className="w-4 h-4" />
             <span className="text-sm">通知</span>
           </button>
@@ -252,7 +294,7 @@ export default function LearnPage() {
                   </div>
                 </div>
 
-                <Link href={currentProjectHref}>
+                <Link href={currentProjectHref} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 rounded-full inline-block mt-4">
                   <Button className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-full px-8 shadow-lg shadow-cyan-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-200/40 hover:-translate-y-0.5">
                     <Play className="w-4 h-4 mr-2" />
                     继续学习第 {currentProgress?.completedLessons ? currentProgress.completedLessons + 1 : 8} 章
@@ -304,14 +346,14 @@ export default function LearnPage() {
                 <h2 className="text-lg font-semibold text-slate-800">收藏知识点</h2>
               </div>
               <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-cyan-50/50 rounded-xl border border-cyan-100 hover:bg-cyan-50 transition-colors cursor-pointer">
+                <div role="button" tabIndex={0} className="flex items-start gap-3 p-3 bg-cyan-50/50 rounded-xl border border-cyan-100 hover:bg-cyan-50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-1">
                   <Bookmark className="w-4 h-4 text-cyan-500 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-slate-800">Decorator Parsing</p>
                     <p className="text-xs text-slate-500">装饰器解析</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 bg-cyan-50/50 rounded-xl border border-cyan-100 hover:bg-cyan-50 transition-colors cursor-pointer">
+                <div role="button" tabIndex={0} className="flex items-start gap-3 p-3 bg-cyan-50/50 rounded-xl border border-cyan-100 hover:bg-cyan-50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-1">
                   <Bookmark className="w-4 h-4 text-cyan-500 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-slate-800">Asynchronous Programming</p>
@@ -335,22 +377,43 @@ export default function LearnPage() {
                 </Button>
               </Link>
             </div>
+            {deleteProjectError && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+                {deleteProjectError}
+              </div>
+            )}
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {projects.map((project) => {
                 const progress = progressMap[project.id];
                 return (
                   <Card key={project.id} className="glass rounded-2xl shadow-lg hover:shadow-xl transition-all card-hover">
                     <CardContent className="p-5">
-                      <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-start justify-between mb-4 gap-3">
                         <h3 className="font-semibold text-slate-800 line-clamp-1">{project.title}</h3>
-                        <Badge
+                        <div className="flex items-center gap-2">
+                          <Badge
                           variant={project.status === "active" ? "default" : "secondary"}
                           className={project.status === "active" ? "bg-gradient-to-r from-cyan-500 to-cyan-600 border-0" : ""}
                         >
                           {project.status === "active" ? "进行中" : "已完成"}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="删除项目"
+                          disabled={deletingProjectId !== null}
+                          onClick={() => void handleDeleteProject(project.id)}
+                          className="h-8 w-8 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-600"
+                        >
+                          {deletingProjectId === project.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                      </Button>
                       </div>
-                      
+                      </div>
+                       
                       {progress && (
                         <>
                           <div className="space-y-2 mb-4">
@@ -374,7 +437,7 @@ export default function LearnPage() {
                         </>
                       )}
 
-                      <Link href={getProjectHref(project.id, progress?.currentLessonId ?? null)}>
+                      <Link href={getProjectHref(project.id, progress?.currentLessonId ?? null)} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 rounded-xl block mt-4">
                         <Button className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 rounded-xl shadow-md shadow-cyan-200/50 transition-all duration-300 hover:shadow-lg">
                           <Play className="w-4 h-4 mr-2" />
                           {progress?.currentLessonId ? "继续学习" : "开始学习"}
@@ -397,7 +460,7 @@ export default function LearnPage() {
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">还没有学习项目</h3>
               <p className="text-slate-500 mb-6">创建你的第一个学习项目，开始个性化学习之旅</p>
-              <Link href="/onboarding">
+              <Link href="/onboarding" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 rounded-full inline-block mt-4">
                 <Button className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 rounded-full px-6 shadow-lg shadow-cyan-200/50">
                   <Plus className="w-4 h-4 mr-2" />
                   创建学习项目

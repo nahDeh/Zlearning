@@ -180,7 +180,7 @@ export function ExerciseQuiz({ exercises, onComplete }: ExerciseQuizProps) {
                     : isSelected
                     ? "border-primary bg-primary/5"
                     : "border-input hover:bg-accent"
-                } ${submitted ? "cursor-default" : "cursor-pointer"}`}
+                } ${submitted ? "cursor-default" : "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"}`}
               >
                 <div className="flex items-center gap-3">
                   <div

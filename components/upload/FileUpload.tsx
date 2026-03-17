@@ -259,8 +259,10 @@ export function FileUpload({
       </CardHeader>
       <CardContent className="space-y-4">
         <div
+          role="button"
+          tabIndex={0}
           className={cn(
-            "cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors",
+            "cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
             isDragging
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
@@ -269,6 +271,12 @@ export function FileUpload({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
         >
           <Upload className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
           <p className="mb-2 text-sm text-muted-foreground">

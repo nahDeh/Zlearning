@@ -21,7 +21,7 @@ export function HeroSection() {
           通过 AI 个性化学习教练，帮助你完成持续、自适应的学习闭环
         </p>
 
-        <Link href="/onboarding">
+        <Link href="/onboarding" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-4 rounded-full inline-block">
           <Button
             size="lg"
             className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white border-0 rounded-full px-8 py-6 text-base font-medium shadow-xl shadow-cyan-200/50 transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-200/40 hover:-translate-y-1 group"

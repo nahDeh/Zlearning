@@ -65,7 +65,7 @@ function MessageBubble({
                 key={option.id}
                 variant="outline"
                 size="sm"
-                className="justify-start text-left h-auto py-2.5 px-4 w-full rounded-xl border-cyan-200 hover:bg-cyan-50 hover:border-cyan-300 transition-all"
+                className="justify-start text-left h-auto py-2.5 px-4 w-full rounded-xl border-cyan-200 hover:bg-cyan-50 hover:border-cyan-300 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-1"
                 onClick={() => onOptionSelect?.(option)}
               >
                 {option.text}
@@ -156,13 +156,13 @@ export function ChatInterface({
             onChange={(e) => setInput(e.target.value)}
             placeholder={hasOptions ? "或直接输入自定义回答..." : placeholder}
             disabled={isLoading}
-            className="flex-1 rounded-xl border-slate-200 focus:border-cyan-300 focus:ring-cyan-200"
+            className="flex-1 rounded-xl border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2"
           />
           <Button 
             type="submit" 
             disabled={isLoading || !input.trim()} 
             size="icon"
-            className="rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 shadow-md shadow-cyan-200/50"
+            className="rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 shadow-md shadow-cyan-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
           >
             <Send className="h-4 w-4" />
           </Button>

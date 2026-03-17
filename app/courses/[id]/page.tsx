@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +11,10 @@ import {
   BookOpen,
   Clock,
   Loader2,
+  RotateCcw,
   Sparkles,
   Target,
+  Trash2,
 } from "lucide-react";
 
 interface Lesson {
@@ -119,9 +122,15 @@ function getDifficultyText(difficulty: string): string {
 
 export default function CoursePage({ params }: PageProps) {
   const { id } = params;
+  const router = useRouter();
   const [outline, setOutline] = useState<OutlineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [resettingCourse, setResettingCourse] = useState(false);
+  const [deletingCourse, setDeletingCourse] = useState(false);
+  const [regeneratingLessonId, setRegeneratingLessonId] = useState<string | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -161,6 +170,100 @@ export default function CoursePage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : "生成失败");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleResetCourse = async () => {
+    if (!outline) return;
+
+    const confirmed = window.confirm(
+      "确定清空已生成的课程内容吗？将删除所有章节内容与练习题，可重新生成。"
+    );
+    if (!confirmed) return;
+
+    try {
+      setResettingCourse(true);
+      setError(null);
+
+      const response = await fetch(`/api/outlines/${outline.id}/lessons`, {
+        method: "DELETE",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "重置课程失败");
+      }
+
+      const refreshed = await getOutlineData(id);
+      setOutline(refreshed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "重置课程失败");
+    } finally {
+      setResettingCourse(false);
+    }
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!outline) return;
+
+    const confirmed = window.confirm(
+      "确定删除整个课程吗？将删除大纲与已生成内容，无法恢复。"
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingCourse(true);
+      setError(null);
+
+      const response = await fetch(`/api/outlines/${outline.id}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "删除课程失败");
+      }
+
+      router.push(`/projects/${outline.projectId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除课程失败，请稍后重试");
+    } finally {
+      setDeletingCourse(false);
+    }
+  };
+
+  const handleRegenerateLesson = async (lessonId: string) => {
+    const confirmed = window.confirm("确定重新生成本章节内容吗？将覆盖当前内容。");
+    if (!confirmed) return;
+
+    try {
+      setRegeneratingLessonId(lessonId);
+      setError(null);
+
+      const response = await fetch(`/api/lessons/${lessonId}/generate`, {
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "重新生成失败");
+      }
+
+      const refreshed = await getOutlineData(id);
+      setOutline(refreshed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "重新生成失败，请稍后重试");
+    } finally {
+      setRegeneratingLessonId(null);
     }
   };
 
@@ -220,19 +323,52 @@ export default function CoursePage({ params }: PageProps) {
       <div className="container mx-auto px-4 py-8">
         <Link
           href={`/outlines/${id}`}
-          className="mb-6 inline-flex items-center gap-2 text-slate-600 transition-colors hover:text-cyan-600"
+          className="mb-6 inline-flex items-center gap-2 text-slate-600 transition-colors hover:text-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded p-1"
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="text-sm font-medium">返回大纲</span>
         </Link>
 
-        <div className="mb-8">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
           <h1 className="mb-2 text-3xl font-bold text-slate-800">课程章节</h1>
           <p className="text-slate-500">
             {outline.project?.title ? `${outline.project.title} · ` : ""}
             共 {chapters.length} 个章节
             {hasGeneratedContent ? ` · 已生成 ${lessons.length} 个章节内容` : ""}
           </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {hasGeneratedContent && (
+              <Button
+                variant="outline"
+                onClick={handleResetCourse}
+                disabled={resettingCourse || generating || deletingCourse}
+                className="rounded-full"
+              >
+                {resettingCourse ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                重置课程
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleDeleteCourse}
+              disabled={deletingCourse || generating || resettingCourse}
+              className="rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              {deletingCourse ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              删除课程
+            </Button>
+          </div>
         </div>
 
         {!hasGeneratedContent && (
@@ -331,12 +467,32 @@ export default function CoursePage({ params }: PageProps) {
                     </div>
 
                     {hasContent && lesson && (
-                      <Link href={`/lessons/${lesson.id}`}>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => void handleRegenerateLesson(lesson.id)}
+                          disabled={
+                            regeneratingLessonId !== null ||
+                            generating ||
+                            resettingCourse ||
+                            deletingCourse
+                          }
+                          className="rounded-full"
+                        >
+                          {regeneratingLessonId === lesson.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                          )}
+                          重新生成
+                        </Button>
+                        <Link href={`/lessons/${lesson.id}`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 rounded-full inline-block">
                         <Button className="rounded-full bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-md shadow-cyan-200/50 hover:from-cyan-600 hover:to-cyan-700">
                           <BookOpen className="mr-2 h-4 w-4" />
                           开始学习
-                        </Button>
+                       </Button>
                       </Link>
+                      </div>
                     )}
                   </div>
                 </CardContent>

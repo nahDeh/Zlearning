@@ -107,6 +107,16 @@ export default function ConfirmPage() {
 
       if (response.ok) {
         const data = await response.json();
+        if (recommendedBooks.length > 0) {
+          try {
+            localStorage.setItem(
+              `recommendedBooks:${data.projectId}`,
+              JSON.stringify(recommendedBooks)
+            );
+          } catch (error) {
+            console.warn("Failed to persist recommended books:", error);
+          }
+        }
         sessionStorage.removeItem("learningProfile");
         router.push(`/projects/${data.projectId}`);
       }

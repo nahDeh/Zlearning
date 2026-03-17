@@ -192,7 +192,7 @@ export function LessonChatPanel({
             placeholder="问我本章内容、练习题、报错排查…"
             disabled={isLoading}
             rows={2}
-            className="resize-none rounded-xl bg-slate-900/40 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus-visible:ring-cyan-500/40"
+            className="resize-none rounded-xl bg-slate-900/40 border-slate-700/60 text-slate-200 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -203,7 +203,7 @@ export function LessonChatPanel({
           <Button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="h-auto rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white shadow-md shadow-cyan-500/20"
+            className="h-auto rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white shadow-md shadow-cyan-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             aria-label="发送"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

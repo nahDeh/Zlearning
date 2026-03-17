@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, BookOpen, Loader2, Target } from "lucide-react";
+import { ArrowLeft, BookOpen, Loader2, Target, Trash2 } from "lucide-react";
 import { OutlineChapter } from "@/types/outline";
 import { OutlineEditor } from "@/components/outline/OutlineEditor";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ export default function OutlinePage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isConfirming, setIsConfirming] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchOutline = React.useCallback(async () => {
@@ -129,6 +130,38 @@ export default function OutlinePage() {
     }
   };
 
+  const handleDeleteOutline = async () => {
+    if (!outline) return;
+
+    const confirmed = window.confirm(
+      "确定删除该大纲及其已生成的课程内容吗？删除后可在项目页重新生成。"
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsDeleting(true);
+      setError(null);
+
+      const response = await fetch(`/api/outlines/${outlineId}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "删除大纲失败");
+      }
+
+      router.push(`/projects/${outline.projectId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "删除大纲失败，请稍后重试");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/20">
@@ -140,6 +173,20 @@ export default function OutlinePage() {
               </div>
               <p className="font-medium text-slate-600">加载中...</p>
             </div>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="删除大纲"
+              disabled={isDeleting || isSaving || isConfirming}
+              onClick={handleDeleteOutline}
+              className="rounded-full border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
           </div>
         </div>
       </div>
@@ -196,8 +243,10 @@ export default function OutlinePage() {
                 </p>
               )}
             </div>
-            <div className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-500">
-              版本 {outline.version}
+            <div className="flex items-center gap-2">
+              <div className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-500">
+                版本 {outline.version}
+              </div>
             </div>
           </div>
         </div>

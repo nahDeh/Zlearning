@@ -118,7 +118,7 @@ export function LessonContent({
       <div className="flex gap-2 border-b">
         <button
           onClick={() => setActiveTab("content")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-t-md ${
             activeTab === "content"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -128,7 +128,7 @@ export function LessonContent({
         </button>
         <button
           onClick={() => setActiveTab("examples")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-t-md ${
             activeTab === "examples"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -143,7 +143,7 @@ export function LessonContent({
           <CardContent className="pt-6">
             {content ? (
               <div
-                className="prose prose-slate max-w-none"
+                className="prose prose-slate max-w-[75ch] mx-auto leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(content) }}
               />
             ) : (

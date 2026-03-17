@@ -15,6 +15,7 @@ import {
   FileUpload,
   type UploadedMaterial,
 } from "@/components/upload/FileUpload";
+import type { RecommendedBook } from "@/services/ai";
 import {
   ArrowLeft,
   ArrowRight,
@@ -22,6 +23,8 @@ import {
   Clock,
   FileText,
   Loader2,
+  Sparkles,
+  Trash2,
   Target,
   Upload,
   User,
@@ -86,6 +89,31 @@ function getStatusBadge(status: string) {
   return <Badge variant={config.variant}>{config.label}</Badge>;
 }
 
+function coerceRecommendedBooks(input: unknown): RecommendedBook[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .filter((item) => item && typeof item === "object")
+    .map((item) => {
+      const record = item as Record<string, unknown>;
+      const levelRaw = record.level;
+      const level =
+        levelRaw === "入门" || levelRaw === "进阶" || levelRaw === "高级"
+          ? levelRaw
+          : "入门";
+
+      return {
+        title: typeof record.title === "string" ? record.title : "",
+        author: typeof record.author === "string" ? record.author : "",
+        description:
+          typeof record.description === "string" ? record.description : "",
+        level,
+        reason: typeof record.reason === "string" ? record.reason : "",
+      } as RecommendedBook;
+    })
+    .filter((book) => Boolean(book.title));
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -99,6 +127,20 @@ export default function ProjectPage() {
   const [outlineLoadingId, setOutlineLoadingId] = React.useState<string | null>(
     null
   );
+  const [deletingMaterialId, setDeletingMaterialId] = React.useState<
+    string | null
+  >(null);
+  const [deleteMaterialError, setDeleteMaterialError] = React.useState<
+    string | null
+  >(null);
+  const [recommendedBooks, setRecommendedBooks] = React.useState<
+    RecommendedBook[]
+  >([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] =
+    React.useState(true);
+  const [recommendationsError, setRecommendationsError] = React.useState<
+    string | null
+  >(null);
 
   const fetchProject = React.useCallback(async () => {
     try {
@@ -131,6 +173,100 @@ export default function ProjectPage() {
     void fetchMaterials();
   }, [fetchMaterials, fetchProject]);
 
+  React.useEffect(() => {
+    if (isLoading || !project) return;
+
+    const storageKey = `recommendedBooks:${projectId}`;
+    let cancelled = false;
+
+    async function loadRecommendedBooks() {
+      setIsLoadingRecommendations(true);
+      setRecommendationsError(null);
+
+      try {
+        const cachedRaw = localStorage.getItem(storageKey);
+        if (cachedRaw) {
+          const cached = coerceRecommendedBooks(JSON.parse(cachedRaw));
+          if (cached.length > 0) {
+            if (!cancelled) {
+              setRecommendedBooks(cached);
+              setIsLoadingRecommendations(false);
+            }
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to read cached recommended books:", error);
+      }
+
+      if (!project || !project.profile) {
+        if (!cancelled) {
+          setRecommendedBooks([]);
+          setIsLoadingRecommendations(false);
+        }
+        return;
+      }
+
+      try {
+        const background = project.profile.preferences?.background ?? "";
+        const response = await fetch("/api/recommendations/books", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            profile: {
+              topic: project.profile.topic,
+              goal: project.profile.goal,
+              currentLevel: project.profile.currentLevel,
+              timeBudget: project.profile.timeBudget,
+              learningStyle: project.profile.learningStyle,
+              background,
+            },
+          }),
+        });
+
+        const data = (await response.json()) as {
+          success?: boolean;
+          books?: unknown;
+          error?: string;
+        };
+
+        if (!response.ok || !data.success || !Array.isArray(data.books)) {
+          throw new Error(data.error || "获取推荐资料失败");
+        }
+
+        const books = coerceRecommendedBooks(data.books);
+        if (!cancelled) {
+          setRecommendedBooks(books);
+        }
+
+        if (books.length > 0) {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(books));
+          } catch (error) {
+            console.warn("Failed to persist recommended books:", error);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRecommendedBooks([]);
+          setRecommendationsError(
+            error instanceof Error ? error.message : "获取推荐资料失败，请稍后重试"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingRecommendations(false);
+        }
+      }
+    }
+
+    void loadRecommendedBooks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, project, projectId]);
+
   function handleUploadSuccess(_material: UploadedMaterial) {
     setUploadError(null);
     setOutlineError(null);
@@ -141,6 +277,39 @@ export default function ProjectPage() {
     setUploadError(error);
     void fetchMaterials();
   }
+
+  const deleteMaterial = React.useCallback(
+    async (materialId: string) => {
+      const confirmed = window.confirm("确定删除该资料吗？删除后无法恢复。");
+      if (!confirmed) return;
+
+      try {
+        setDeletingMaterialId(materialId);
+        setDeleteMaterialError(null);
+
+        const response = await fetch(`/api/materials/${materialId}`, {
+          method: "DELETE",
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          success?: boolean;
+          error?: string;
+        };
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "删除资料失败");
+        }
+
+        void fetchMaterials();
+      } catch (error) {
+        setDeleteMaterialError(
+          error instanceof Error ? error.message : "删除资料失败，请稍后重试"
+        );
+      } finally {
+        setDeletingMaterialId(null);
+      }
+    },
+    [fetchMaterials]
+  );
 
   const generateOutline = React.useCallback(
     async (materialId: string) => {
@@ -214,7 +383,7 @@ export default function ProjectPage() {
 
       <main className="container mx-auto max-w-5xl px-4 py-8">
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1">
+          <div className="space-y-6 lg:col-span-1">
             <Card className="glass">
               <CardHeader>
                 <CardTitle className="text-lg">学习画像</CardTitle>
@@ -260,6 +429,67 @@ export default function ProjectPage() {
                 )}
               </CardContent>
             </Card>
+
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Sparkles className="h-5 w-5" />
+                  AI 推荐资料
+                </CardTitle>
+                <CardDescription>上一步生成的推荐书籍</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingRecommendations ? (
+                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    正在加载推荐资料...
+                  </div>
+                ) : recommendationsError ? (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                    {recommendationsError}
+                  </div>
+                ) : recommendedBooks.length > 0 ? (
+                  <div className="space-y-3">
+                    {recommendedBooks.map((book, index) => (
+                      <div
+                        key={`${book.title}-${index}`}
+                        className="rounded-xl border border-slate-100 bg-slate-50 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-800">
+                              {book.title}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {book.author}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-indigo-200 text-indigo-700"
+                          >
+                            {book.level}
+                          </Badge>
+                        </div>
+                        {book.reason && (
+                          <p className="mt-2 text-xs text-slate-600">
+                            {book.reason}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                      提示：你可以优先上传这些书籍的 PDF 或 EPUB 文件，系统会自动解析并生成学习资料。
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    暂无推荐资料
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div className="space-y-6 lg:col-span-2">
@@ -300,6 +530,12 @@ export default function ProjectPage() {
                   {outlineError && (
                     <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
                       {outlineError}
+                    </div>
+                  )}
+
+                  {deleteMaterialError && (
+                    <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                      {deleteMaterialError}
                     </div>
                   )}
 
@@ -375,6 +611,23 @@ export default function ProjectPage() {
                                 )}
                               </Button>
                             )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label="删除资料"
+                              disabled={deletingMaterialId !== null || outlineLoadingId !== null}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void deleteMaterial(material.id);
+                              }}
+                              className="h-8 w-8 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              {deletingMaterialId === material.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                             <ArrowRight className="h-5 w-5 text-muted-foreground" />
                           </div>
                         </div>

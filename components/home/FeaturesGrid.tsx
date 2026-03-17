@@ -212,7 +212,11 @@ export function FeaturesGrid() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((feature, index) => (
-            <Link key={index} href={feature.href} className="block">
+            <Link 
+              key={index} 
+              href={feature.href} 
+              className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 rounded-2xl"
+            >
               <FeatureCard
                 title={feature.title}
                 subtitle={feature.subtitle}

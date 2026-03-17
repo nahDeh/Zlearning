@@ -183,13 +183,13 @@ export function OutlineEditor({
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         placeholder="章节标题"
-                        className="rounded-xl border-slate-200 focus:border-cyan-300"
+                        className="rounded-xl border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:border-cyan-300"
                       />
                       <Input
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
                         placeholder="章节描述"
-                        className="rounded-xl border-slate-200 focus:border-cyan-300"
+                        className="rounded-xl border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:border-cyan-300"
                       />
                       <div className="flex gap-2">
                         <Button
@@ -249,7 +249,7 @@ export function OutlineEditor({
                         onChange={(e) =>
                           handleTimeChange(index, parseInt(e.target.value) || 30)
                         }
-                        className="w-16 h-8 rounded-lg border-slate-200 focus:border-cyan-300"
+                        className="w-16 h-8 rounded-lg border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:border-cyan-300"
                       />
                       <span className="text-sm text-slate-500">分钟</span>
                     </div>
@@ -262,7 +262,7 @@ export function OutlineEditor({
                           handleDifficultyChange(index, e.target.value as Difficulty)
                         }
                         className={cn(
-                          "h-8 rounded-lg border border-slate-200 bg-white px-2 text-sm focus:border-cyan-300 focus:outline-none",
+                          "h-8 rounded-lg border border-slate-200 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:border-cyan-300",
                           difficultyColors[chapter.difficulty]
                         )}
                       >
