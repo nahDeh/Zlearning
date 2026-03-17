@@ -17,6 +17,42 @@ type InlineReplacement = {
   html: string;
 };
 
+export type MarkdownHeading = {
+  id: string;
+  text: string;
+  level: number;
+};
+
+function stripInlineMarkdown(text: string): string {
+  return (text ?? "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .trim();
+}
+
+function slugifyHeading(text: string): string {
+  const normalized = (text ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    // Keep a-z/0-9, hyphen, and common CJK ideographs. Avoid unicode property escapes so
+    // this works even when TS target is left at default.
+    .replace(/[^a-z0-9\u4e00-\u9fff-]+/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return normalized || "section";
+}
+
+function createUniqueHeadingId(rawHeadingText: string, used: Record<string, number>): string {
+  const base = slugifyHeading(stripInlineMarkdown(rawHeadingText));
+  const count = used[base] ?? 0;
+  used[base] = count + 1;
+  return count === 0 ? base : `${base}-${count + 1}`;
+}
+
 function renderInline(markdown: string): string {
   // Escape raw HTML first to avoid script injection, then apply a few markdown transforms.
   let text = escapeHtml(markdown);
@@ -56,6 +92,7 @@ function renderInline(markdown: string): string {
 export function markdownToHtml(markdown: string): string {
   const normalized = (markdown ?? "").replace(/\r\n/g, "\n");
   const codeBlocks: CodeBlock[] = [];
+  const headingIds: Record<string, number> = {};
 
   // Extract fenced code blocks first so later inline replacements don't touch code content.
   const withoutCodeBlocks = normalized.replace(
@@ -167,6 +204,7 @@ export function markdownToHtml(markdown: string): string {
 
       const level = headingMatch[1].length;
       const text = headingMatch[2].trim();
+      const id = createUniqueHeadingId(text, headingIds);
 
       const headingByLevel: Record<number, string> = {
         1: 'text-2xl font-bold mt-8 mb-4 text-white',
@@ -176,7 +214,11 @@ export function markdownToHtml(markdown: string): string {
       };
 
       const classes = headingByLevel[level] ?? headingByLevel[3];
-      output.push(`<h${level} class="${classes}">${renderInline(text)}</h${level}>`);
+      output.push(
+        `<h${level} id="${id}" class="${classes} scroll-mt-24">${renderInline(
+          text
+        )}</h${level}>`
+      );
       continue;
     }
 
@@ -205,4 +247,34 @@ export function markdownToHtml(markdown: string): string {
   flushList();
 
   return output.join("\n");
+}
+
+export function extractMarkdownHeadings(markdown: string): MarkdownHeading[] {
+  const normalized = (markdown ?? "").replace(/\r\n/g, "\n");
+  const withoutCodeBlocks = normalized.replace(/```[\s\S]*?```/g, "");
+  const used: Record<string, number> = {};
+
+  const headings: MarkdownHeading[] = [];
+
+  for (const rawLine of withoutCodeBlocks.split("\n")) {
+    const line = rawLine.replace(/\s+$/, "");
+    const headingMatch = line.match(/^(#{1,4})\s+(.*)$/);
+    if (!headingMatch) {
+      continue;
+    }
+
+    const level = headingMatch[1].length;
+    const text = stripInlineMarkdown(headingMatch[2].trim());
+    if (!text) {
+      continue;
+    }
+
+    headings.push({
+      id: createUniqueHeadingId(text, used),
+      text,
+      level,
+    });
+  }
+
+  return headings;
 }

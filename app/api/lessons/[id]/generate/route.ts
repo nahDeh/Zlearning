@@ -76,22 +76,33 @@ async function regenerateLessonContent(
     return generateMockLessonContent(lesson.title, chapterInfo.description);
   }
 
-  const prompt = `你是一位专业的教育内容创作者。请为以下章节生成详细的学习内容。
+  const prompt = `你是一位专业的教学设计师与一线工程师。请为以下章节生成“可直接照着做”的学习内容，强调实战与可操作性。
 
-课程主题: ${topic}
-学习目标: ${goal}
-学习者水平: ${currentLevel}
+课程主题：${topic}
+学习目标：${goal}
+学习者水平：${currentLevel}
 
-章节信息:
-- 标题: ${lesson.title}
-- 描述: ${chapterInfo.description}
-- 难度: ${chapterInfo.difficulty}
+章节信息：
+- 标题：${lesson.title}
+- 描述：${chapterInfo.description}
+- 难度：${chapterInfo.difficulty}
 
-请生成以下内容，以 JSON 格式返回（不要包含任何其他文字）：
+输出要求：
+1) content 必须使用 Markdown，并包含清晰的标题层级（使用 ## / ###），至少包含以下二级标题：
+- ## 核心讲解（拆成 3-6 个 ### 小节，每个小节给出要点 + 代码/命令示例）
+- ## 实战练习（至少 2 个练习：练习 1“跟做”、练习 2“挑战”）
+- ## 常见坑与排错（给出典型错误、原因、排查步骤）
+- ## 小结（3-6 条要点）
+2) 在“实战练习”中，每个练习必须包含：目标、输入/条件、输出/产出、步骤提示、验收标准；并尽量贴近真实工作场景，且与本章知识点强相关。
+3) objective 3-5 条；prerequisites 2-4 条；examples 至少 2 个，代码可复制可运行（必要时给出依赖/环境说明）。
+4) estimatedMinutes 为 30-120 的整数（分钟）。
+5) 只返回 JSON 对象，不要包含任何其他文字。
+
+请按以下 JSON 结构返回（字段名/类型必须严格一致）：
 {
   "objective": ["学习目标1", "学习目标2", "学习目标3"],
   "prerequisites": ["前置知识1", "前置知识2"],
-  "content": "详细的核心内容，使用 Markdown 格式，包含多个段落和子标题",
+  "content": "Markdown 内容（包含 ##/### 标题与实战练习）",
   "examples": [
     {
       "title": "示例标题",
@@ -100,7 +111,7 @@ async function regenerateLessonContent(
     }
   ],
   "summary": "本章节的总结",
-  "estimatedMinutes": 预计学习时间（分钟，数字）
+  "estimatedMinutes": 60
 }`;
 
   try {
@@ -116,7 +127,7 @@ async function regenerateLessonContent(
           {
             role: "system",
             content:
-              "你是一位专业的教育内容创作者，擅长创建结构清晰、内容丰富的学习材料。请只返回 JSON 格式的结果，不要包含任何其他文字。",
+              "你是一位专业的教学设计师，擅长把知识点转化为可执行的学习材料与实战练习。只返回 JSON 对象，不要输出任何解释性文字。",
           },
           { role: "user", content: prompt },
         ],

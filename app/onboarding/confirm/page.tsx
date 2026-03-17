@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LearningProfileDraft } from "@/types/questionnaire";
-import { RecommendedBook, generateRecommendedBooks } from "@/services/ai";
+import type { RecommendedBook } from "@/services/ai";
 import {
   CheckCircle2,
   Clock,
@@ -65,10 +65,27 @@ export default function ConfirmPage() {
   async function loadRecommendedBooks(profileData: LearningProfileDraft) {
     setIsLoadingBooks(true);
     try {
-      const books = await generateRecommendedBooks(profileData);
-      setRecommendedBooks(books);
+      const res = await fetch("/api/recommendations/books", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile: profileData }),
+      });
+
+      const data = (await res.json()) as {
+        success?: boolean;
+        books?: RecommendedBook[];
+        error?: string;
+      };
+
+      if (res.ok && data.success && Array.isArray(data.books)) {
+        setRecommendedBooks(data.books);
+      } else {
+        console.warn("Book recommendations failed:", data.error);
+        setRecommendedBooks([]);
+      }
     } catch (error) {
       console.error("Failed to load book recommendations:", error);
+      setRecommendedBooks([]);
     } finally {
       setIsLoadingBooks(false);
     }

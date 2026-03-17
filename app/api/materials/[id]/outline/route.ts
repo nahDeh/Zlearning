@@ -33,35 +33,43 @@ async function generateOutlineWithAI(
     return generateMockOutline();
   }
 
-  const prompt = `你是一个专业的课程设计师。请根据以下学习资料和学习者画像，设计一个学习大纲。
+  const prompt = `你是资深课程设计师/教学设计师。请基于“学习者画像 + 学习资料（节选）”，设计一个可落地、以实战为导向的学习大纲。
 
 学习者画像：
-- 学习主题: ${profile.topic}
-- 学习目标: ${profile.goal}
-- 当前水平: ${profile.currentLevel}
-- 每周学习时间: ${profile.timeBudget} 小时
-- 学习风格: ${profile.learningStyle}
+- 学习主题：${profile.topic}
+- 学习目标：${profile.goal}
+- 当前水平：${profile.currentLevel}
+- 每周学习时间：${profile.timeBudget} 小时
+- 学习风格：${profile.learningStyle}
 
 学习资料内容（节选）：
 ${extractedText.slice(0, 4000)}
 
-请生成一个包含 5-10 个章节的学习大纲。每个章节需要包含：
-- title: 章节标题（简洁明了）
-- description: 章节描述（简要说明学习内容）
-- estimatedMinutes: 预计学习时间（分钟）
-- difficulty: 难度等级（easy/medium/hard）
+输出要求：
+1. 生成 5-10 个章节，难度循序渐进，内容尽量贴合资料（避免凭空发散）。
+2. 每个章节必须包含：
+   - title：章节标题（动词+名词，简洁明确，避免泛泛如“进阶”“综合”）
+   - description：2-4 句中文描述，必须包含三部分：
+     (1) 本章核心技能/知识点
+     (2) 典型应用场景/工作任务
+     (3) 实战任务：一句话写清“要做什么 + 产出什么”，必须以“实战任务：”开头
+   - estimatedMinutes：30-120 的整数（分钟）
+   - difficulty：easy|medium|hard
+3. 约束：
+   - 第 1 章为入门与环境/基础概念
+   - 至少 1 章为综合实战项目（建议最后一章，title 包含“实战项目”或“综合项目”，description 的实战任务要更具体）
+   - 各章节 title 不要重复
+4. 仅返回 JSON 数组，不要任何额外文字。
 
-请以 JSON 数组格式返回，格式如下：
+JSON 示例：
 [
   {
     "title": "章节标题",
-    "description": "章节描述",
-    "estimatedMinutes": 30,
+    "description": "章节描述…… 实战任务：……",
+    "estimatedMinutes": 60,
     "difficulty": "easy"
   }
-]
-
-只返回 JSON 数组，不要包含任何其他文字。`;
+]`;
 
   try {
     const response = await fetch(`${AI_API_BASE_URL}/chat/completions`, {
@@ -75,7 +83,8 @@ ${extractedText.slice(0, 4000)}
         messages: [
           {
             role: "system",
-            content: "你是一个专业的课程设计师，擅长根据学习资料和学习者需求设计结构化的学习大纲。请只返回 JSON 格式的结果。",
+            content:
+              "你是资深课程设计师，擅长把知识点转化为可执行的学习路径与实战任务。只返回 JSON 数组，不要输出任何解释性文字。",
           },
           { role: "user", content: prompt },
         ],

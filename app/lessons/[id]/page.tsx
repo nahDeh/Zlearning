@@ -1,22 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { markdownToHtml } from "@/lib/markdown";
+import { extractMarkdownHeadings, markdownToHtml } from "@/lib/markdown";
+import { LessonChatPanel } from "@/components/chat/LessonChatPanel";
 import { 
   ChevronLeft, 
   ChevronRight, 
   Settings, 
   Moon, 
   Maximize2,
-  MessageCircle,
   CheckCircle,
   Edit3,
   Loader2,
   BookOpen,
-  Sparkles,
   Target
 } from "lucide-react";
 
@@ -52,7 +51,7 @@ export default function LessonPage({ params }: PageProps) {
   const { id } = params;
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState("简介");
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isMarkedComplete, setIsMarkedComplete] = useState(false);
   const [progressError, setProgressError] = useState<string | null>(null);
@@ -60,6 +59,128 @@ export default function LessonPage({ params }: PageProps) {
   const hasReportedStudyTimeRef = useRef(false);
   const lessonIdForProgress = lesson?.id ?? null;
   const projectIdForProgress = lesson?.outline.projectId ?? null;
+
+  const tocItems = useMemo(() => {
+    if (!lesson?.content) {
+      return [];
+    }
+
+    const headings = extractMarkdownHeadings(lesson.content);
+    const preferred = headings.filter((heading) => heading.level >= 2 && heading.level <= 3);
+    const fallback = headings.filter((heading) => heading.level >= 1 && heading.level <= 3);
+    const candidates = preferred.length > 0 ? preferred : fallback;
+    const withoutTitle = candidates.filter(
+      (heading) => heading.text.trim() !== (lesson.title ?? "").trim()
+    );
+
+    const picked = withoutTitle.length > 0 ? withoutTitle : candidates;
+    return picked.map((heading) => ({
+      id: heading.id,
+      title: heading.text,
+      level: heading.level,
+    }));
+  }, [lesson?.content, lesson?.title]);
+
+  useEffect(() => {
+    if (tocItems.length === 0) {
+      setActiveHeadingId(null);
+      return;
+    }
+
+    setActiveHeadingId((prev) => prev ?? tocItems[0]?.id ?? null);
+  }, [tocItems]);
+
+  useEffect(() => {
+    if (!lesson?.id || tocItems.length === 0) {
+      return;
+    }
+
+    const ids = tocItems.map((item) => item.id);
+    const headingElements = ids
+      .map((headingId) => document.getElementById(headingId))
+      .filter((element): element is HTMLElement => Boolean(element));
+
+    if (headingElements.length === 0) {
+      return;
+    }
+
+    const offset = 80;
+
+    const updateActiveHeading = () => {
+      let current = headingElements[0];
+      for (const element of headingElements) {
+        if (element.getBoundingClientRect().top - offset <= 0) {
+          current = element;
+          continue;
+        }
+        break;
+      }
+
+      setActiveHeadingId(current?.id ?? null);
+    };
+
+    let rafId = 0;
+    const handleScroll = () => {
+      if (rafId) {
+        return;
+      }
+
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        updateActiveHeading();
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    updateActiveHeading();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [lesson?.id, tocItems]);
+
+  useEffect(() => {
+    if (!lesson?.id || tocItems.length === 0) {
+      return;
+    }
+
+    const hash = typeof window === "undefined" ? "" : window.location.hash.slice(1);
+    if (!hash) {
+      return;
+    }
+
+    const target = document.getElementById(hash);
+    if (!target) {
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [lesson?.id, tocItems]);
+
+  const scrollToHeading = (headingId: string) => {
+    const target = document.getElementById(headingId);
+    if (!target) {
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+
+    setActiveHeadingId(headingId);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${headingId}`);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -203,14 +324,6 @@ export default function LessonPage({ params }: PageProps) {
   const prevLesson = currentIndex > 0 ? allLessons[currentIndex - 1] : null;
   const nextLesson = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
 
-  // 目录结构
-  const tocItems = [
-    { id: "intro", title: "简介" },
-    { id: "event-loop", title: "事件循环" },
-    { id: "coroutine", title: "协程" },
-    { id: "practice", title: "实战练习" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200">
       {/* 顶部导航栏 */}
@@ -240,45 +353,41 @@ export default function LessonPage({ params }: PageProps) {
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex items-start gap-6 px-6">
         {/* 左侧目录 */}
-        <aside className="w-72 glass-dark border-r border-slate-700/50 min-h-[calc(100vh-60px)] p-5">
+        <aside className="w-72 glass-dark border border-slate-700/50 rounded-2xl p-5 mt-6 sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto">
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-cyan-400" />
               目录
             </h2>
-            <nav className="space-y-1">
-              {tocItems.map((item) => (
+            <nav className="space-y-1" aria-label="章节目录">
+              {tocItems.length === 0 ? (
+                <p className="px-4 py-2 text-sm text-slate-500">暂无可跳转的小节</p>
+              ) : (
+                tocItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveSection(item.title)}
-                  className={`w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all ${
-                    activeSection === item.title
+                  onClick={() => scrollToHeading(item.id)}
+                  aria-current={activeHeadingId === item.id ? "true" : undefined}
+                  className={`w-full text-left pr-4 py-2.5 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 cursor-pointer ${
+                    item.level === 3 ? "pl-8 text-xs" : "pl-4 text-sm"
+                  } ${
+                    activeHeadingId === item.id
                       ? "bg-gradient-to-r from-cyan-500/20 to-cyan-600/10 text-cyan-400 border border-cyan-500/30"
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                   }`}
                 >
                   {item.title}
                 </button>
-              ))}
+                ))
+              )}
             </nav>
           </div>
-
-          {/* AI 教练按钮 */}
-          <button className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-xl text-cyan-400 hover:from-cyan-500/30 hover:to-blue-500/30 transition-all group">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div className="text-left">
-              <span className="text-sm font-medium block">AI 教练</span>
-              <span className="text-xs text-cyan-400/70">随时为你解答</span>
-            </div>
-          </button>
         </aside>
 
         {/* 主内容区 */}
-        <main className="flex-1 p-8 max-w-4xl">
+        <main className="flex-1 min-w-0 p-8 max-w-4xl">
           {/* 章节标题 */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
@@ -423,8 +532,13 @@ asyncio.run(main())`}</code>
           )}
         </main>
 
+        {/* AI 对话栏 */}
+        <aside className="w-80 xl:w-96 mt-6 sticky top-24 h-[calc(100vh-6rem)]">
+          <LessonChatPanel lessonId={lesson.id} />
+        </aside>
+
         {/* 右侧课程进度 */}
-        <aside className="w-72 glass-dark border-l border-slate-700/50 min-h-[calc(100vh-60px)] p-5">
+        <aside className="w-72 glass-dark border border-slate-700/50 rounded-2xl p-5 mt-6 sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto">
           <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center">
               <span className="text-cyan-400 text-xs">#</span>
