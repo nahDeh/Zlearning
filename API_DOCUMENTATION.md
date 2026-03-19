@@ -128,6 +128,30 @@ GET /api/projects/clx123...
 }
 ```
 
+### DELETE /api/projects/:id
+
+删除学习项目（同时删除项目下的资料、大纲/课程等关联数据，并清理上传文件）。
+
+**路径参数**:
+
+| 参数 | 类型     | 说明    |
+| -- | ------ | ----- |
+| id | string | 项目 ID |
+
+**请求示例**:
+
+```bash
+DELETE /api/projects/clx123...
+```
+
+**响应示例**:
+
+```json
+{
+  "success": true
+}
+```
+
 ### POST /api/projects
 
 创建新的学习项目。
@@ -347,6 +371,65 @@ GET /api/materials/upload?projectId=clx123...
 }
 ```
 
+### GET /api/materials
+
+获取项目的资料列表（推荐使用）。
+
+**查询参数**:
+
+| 参数        | 类型     | 必填 | 说明    |
+| --------- | ------ | -- | ----- |
+| projectId | string | 是  | 项目 ID |
+
+**请求示例**:
+
+```bash
+GET /api/materials?projectId=clx123...
+```
+
+**响应示例**:
+
+```json
+{
+  "success": true,
+  "materials": [
+    {
+      "id": "clx789...",
+      "filename": "learning.txt",
+      "fileType": "txt",
+      "fileSize": 1024,
+      "parseStatus": "completed",
+      "chunkCount": 5,
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### DELETE /api/materials/:id
+
+删除资料（同时删除解析分块与上传文件）。
+
+**路径参数**:
+
+| 参数 | 类型     | 说明    |
+| -- | ------ | ----- |
+| id | string | 资料 ID |
+
+**请求示例**:
+
+```bash
+DELETE /api/materials/clx789...
+```
+
+**响应示例**:
+
+```json
+{
+  "success": true
+}
+```
+
 ***
 
 ## 5. 大纲管理
@@ -531,6 +614,32 @@ GET /api/materials/upload?projectId=clx123...
 }
 ```
 
+### DELETE /api/outlines/:id/lessons
+
+重置课程：删除指定大纲下已生成的全部章节内容（Lessons），并清空项目的 `currentLessonId`。
+
+**路径参数**:
+
+| 参数 | 类型     | 说明    |
+| -- | ------ | ----- |
+| id | string | 大纲 ID |
+
+**请求示例**:
+
+```bash
+DELETE /api/outlines/clxabc.../lessons
+```
+
+**响应示例**:
+
+```json
+{
+  "success": true,
+  "outlineId": "clxabc...",
+  "deletedLessonCount": 5
+}
+```
+
 ***
 
 ## 7. 章节学习
@@ -576,6 +685,41 @@ GET /api/materials/upload?projectId=clx123...
       { "id": "clxdef...", "title": "基础概念入门", "orderIndex": 0 },
       { "id": "clxghi...", "title": "核心原理深入", "orderIndex": 1 }
     ]
+  }
+}
+```
+
+### PUT /api/lessons/:id
+
+更新章节内容（用于手动编辑课程内容）。
+
+**路径参数**:
+
+| 参数 | 类型     | 说明    |
+| -- | ------ | ----- |
+| id | string | 章节 ID |
+
+**请求体**（字段可按需传入）:
+
+```json
+{
+  "title": "更新后的标题",
+  "content": "Markdown 内容",
+  "summary": "章节总结",
+  "estimatedMinutes": 45,
+  "objective": ["目标 1", "目标 2"],
+  "prerequisites": ["前置 1", "前置 2"]
+}
+```
+
+**响应示例**:
+
+```json
+{
+  "success": true,
+  "lesson": {
+    "id": "clxdef...",
+    "outlineId": "clxabc..."
   }
 }
 ```

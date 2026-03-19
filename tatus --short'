@@ -1,0 +1,148 @@
+warning: in the working copy of 'app/api/lessons/[id]/route.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app/api/lessons/[id]/route.ts b/app/api/lessons/[id]/route.ts[m
+[1mindex 0134154..16a45af 100644[m
+[1m--- a/app/api/lessons/[id]/route.ts[m
+[1m+++ b/app/api/lessons/[id]/route.ts[m
+[36m@@ -1,5 +1,6 @@[m
+ import { NextRequest, NextResponse } from "next/server";[m
+ import { prisma } from "@/lib/prisma";[m
+[32m+[m[32mimport type { Prisma } from "@prisma/client";[m
+ [m
+ function parseJsonField<T>(field: string | null, defaultValue: T): T {[m
+   if (!field) return defaultValue;[m
+[36m@@ -64,3 +65,135 @@[m [mexport async function GET([m
+     );[m
+   }[m
+ }[m
+[32m+[m
+[32m+[m[32mfunction normalizeStringArray(input: unknown): string[] | null {[m
+[32m+[m[32m  if (!Array.isArray(input)) {[m
+[32m+[m[32m    return null;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const items = input[m
+[32m+[m[32m    .filter((item) => typeof item === "string")[m
+[32m+[m[32m    .map((item) => item.trim())[m
+[32m+[m[32m    .filter((item) => item.length > 0);[m
+[32m+[m
+[32m+[m[32m  return items;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction normalizeExamples([m
+[32m+[m[32m  input: unknown[m
+[32m+[m[32m): Array<{ title: string; code?: string; explanation: string }> | null {[m
+[32m+[m[32m  if (!Array.isArray(input)) {[m
+[32m+[m[32m    return null;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const examples: Array<{ title: string; code?: string; explanation: string }> = [];[m
+[32m+[m
+[32m+[m[32m  for (const item of input) {[m
+[32m+[m[32m    if (!item || typeof item !== "object") {[m
+[32m+[m[32m      continue;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const record = item as Record<string, unknown>;[m
+[32m+[m[32m    const title = typeof record.title === "string" ? record.title.trim() : "";[m
+[32m+[m[32m    const explanation =[m
+[32m+[m[32m      typeof record.explanation === "string" ? record.explanation.trim() : "";[m
+[32m+[m
+[32m+[m[32m    if (!title || !explanation) {[m
+[32m+[m[32m      continue;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const example: { title: string; code?: string; explanation: string } = {[m
+[32m+[m[32m      title,[m
+[32m+[m[32m      explanation,[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    if (typeof record.code === "string" && record.code.trim()) {[m
+[32m+[m[32m      example.code = record.code;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    examples.push(example);[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return examples;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function PUT([m
+[32m+[m[32m  request: NextRequest,[m
+[32m+[m[32m  { params }: { params: Promise<{ id: string }> }[m
+[32m+[m[32m) {[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const { id } = await params;[m
+[32m+[m[32m    const body = (await request.json().catch(() => ({}))) as Record<[m
+[32m+[m[32m      string,[m
+[32m+[m[32m      unknown[m
+[32m+[m[32m    >;[m
+[32m+[m
+[32m+[m[32m    const updateData: Prisma.LessonUpdateInput = {};[m
+[32m+[m
+[32m+[m[32m    if (typeof body.title === "string") {[m
+[32m+[m[32m      updateData.title = body.title.trim();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (typeof body.content === "string") {[m
+[32m+[m[32m      updateData.content = body.content;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (typeof body.summary === "string") {[m
+[32m+[m[32m      updateData.summary = body.summary;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (body.estimatedMinutes === null || typeof body.estimatedMinutes === "number") {[m
+[32m+[m[32m      updateData.estimatedMinutes =[m
+[32m+[m[32m        body.estimatedMinutes === null[m
+[32m+[m[32m          ? null[m
+[32m+[m[32m          : Math.max(0, Math.round(body.estimatedMinutes));[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ("objective" in body) {[m
+[32m+[m[32m      const objective = normalizeStringArray(body.objective);[m
+[32m+[m[32m      if (!objective) {[m
+[32m+[m[32m        return NextResponse.json({ error: "objective 格式错误" }, { status: 400 });[m
+[32m+[m[32m      }[m
+[32m+[m[32m      updateData.objective = JSON.stringify(objective);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ("prerequisites" in body) {[m
+[32m+[m[32m      const prerequisites = normalizeStringArray(body.prerequisites);[m
+[32m+[m[32m      if (!prerequisites) {[m
+[32m+[m[32m        return NextResponse.json([m
+[32m+[m[32m          { error: "prerequisites 格式错误" },[m
+[32m+[m[32m          { status: 400 }[m
+[32m+[m[32m        );[m
+[32m+[m[32m      }[m
+[32m+[m[32m      updateData.prerequisites = JSON.stringify(prerequisites);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ("examples" in body) {[m
+[32m+[m[32m      const examples = normalizeExamples(body.examples);[m
+[32m+[m[32m      if (!examples) {[m
+[32m+[m[32m        return NextResponse.json({ error: "examples 格式错误" }, { status: 400 });[m
+[32m+[m[32m      }[m
+[32m+[m[32m      updateData.examples = JSON.stringify(examples);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (Object.keys(updateData).length === 0) {[m
+[32m+[m[32m      return NextResponse.json({ error: "缺少可更新字段" }, { status: 400 });[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const lesson = await prisma.lesson.update({[m
+[32m+[m[32m      where: { id },[m
+[32m+[m[32m      data: updateData,[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    return NextResponse.json({[m
+[32m+[m[32m      success: true,[m
+[32m+[m[32m      lesson: {[m
+[32m+[m[32m        id: lesson.id,[m
+[32m+[m[32m        outlineId: lesson.outlineId,[m
+[32m+[m[32m      },[m
+[32m+[m[32m    });[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    console.error("Error updating lesson:", error);[m
+[32m+[m[32m    return NextResponse.json({ error: "更新章节失败" }, { status: 500 });[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m

@@ -61,6 +61,16 @@ export async function GET(
       return NextResponse.json({ error: "项目不存在" }, { status: 404 });
     }
 
+    const activeOutline = await prisma.outline.findFirst({
+      where: { projectId: id, isActive: true },
+      orderBy: { version: "desc" },
+      include: {
+        _count: {
+          select: { lessons: true },
+        },
+      },
+    });
+
     return NextResponse.json({
       success: true,
       project: {
@@ -71,6 +81,14 @@ export async function GET(
               preferences: project.profile.preferences
                 ? JSON.parse(project.profile.preferences)
                 : null,
+            }
+          : null,
+        activeOutline: activeOutline
+          ? {
+              id: activeOutline.id,
+              version: activeOutline.version,
+              createdAt: activeOutline.createdAt,
+              lessonCount: activeOutline._count.lessons,
             }
           : null,
       },

@@ -34,6 +34,12 @@ interface ProjectData {
   id: string;
   title: string;
   status: string;
+  activeOutline?: {
+    id: string;
+    version: number;
+    createdAt: string;
+    lessonCount: number;
+  } | null;
   profile?: {
     topic: string;
     goal: string;
@@ -141,6 +147,10 @@ export default function ProjectPage() {
   const [recommendationsError, setRecommendationsError] = React.useState<
     string | null
   >(null);
+  const [isGeneratingCourse, setIsGeneratingCourse] = React.useState(false);
+  const [courseActionError, setCourseActionError] = React.useState<string | null>(
+    null
+  );
 
   const fetchProject = React.useCallback(async () => {
     try {
@@ -312,15 +322,23 @@ export default function ProjectPage() {
   );
 
   const generateOutline = React.useCallback(
-    async (materialId: string) => {
+    async (materialId: string, regenerate = false) => {
+      if (regenerate) {
+        const confirmed = window.confirm(
+          "确定重新生成学习大纲吗？将创建新的大纲版本，可能需要重新生成课程内容。"
+        );
+        if (!confirmed) return;
+      }
+
       try {
         setOutlineLoadingId(materialId);
         setOutlineError(null);
+        setCourseActionError(null);
 
         const response = await fetch(`/api/materials/${materialId}/outline`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ regenerate: false }),
+          body: JSON.stringify({ regenerate }),
         });
         const data = (await response.json()) as GenerateOutlineResponse;
 
@@ -339,6 +357,51 @@ export default function ProjectPage() {
     },
     [router]
   );
+
+  const handleGenerateCourse = React.useCallback(async () => {
+    const outlineId = project?.activeOutline?.id ?? null;
+    const existingLessonCount = project?.activeOutline?.lessonCount ?? 0;
+
+    if (!outlineId) {
+      setCourseActionError("请先生成学习大纲");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      existingLessonCount > 0
+        ? "确定重新生成课程内容吗？将覆盖当前所有章节内容。"
+        : "确定生成课程内容吗？生成后可进入课程编辑与学习。"
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsGeneratingCourse(true);
+      setCourseActionError(null);
+
+      const response = await fetch("/api/courses/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outlineId }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "生成课程失败");
+      }
+
+      await fetchProject();
+      router.push(`/courses/${outlineId}`);
+    } catch (error) {
+      setCourseActionError(
+        error instanceof Error ? error.message : "生成课程失败，请稍后重试"
+      );
+    } finally {
+      setIsGeneratingCourse(false);
+    }
+  }, [fetchProject, project?.activeOutline?.id, project?.activeOutline?.lessonCount, router]);
 
   if (isLoading) {
     return (
@@ -364,6 +427,9 @@ export default function ProjectPage() {
   const hasMaterials = materials.length > 0;
   const latestCompletedMaterial =
     materials.find((material) => material.parseStatus === "completed") || null;
+  const activeOutline = project.activeOutline ?? null;
+  const hasOutline = Boolean(activeOutline?.id);
+  const hasCourseContent = (activeOutline?.lessonCount ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
@@ -493,6 +559,152 @@ export default function ProjectPage() {
           </div>
 
           <div className="space-y-6 lg:col-span-2">
+            <Card className="glass">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BookOpen className="h-5 w-5" />
+                  大纲与课程
+                </CardTitle>
+                <CardDescription>
+                  在这里可以编辑学习大纲、课程内容、资料，并支持重新生成。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(outlineError || courseActionError) && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                    {courseActionError || outlineError}
+                  </div>
+                )}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">学习大纲</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {hasOutline
+                            ? `版本 ${activeOutline?.version}`
+                            : "尚未生成大纲"}
+                        </p>
+                      </div>
+                      {hasOutline && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 border-slate-200 text-slate-600"
+                        >
+                          v{activeOutline?.version}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {hasOutline ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isGeneratingCourse || outlineLoadingId !== null}
+                            onClick={() => router.push(`/outlines/${activeOutline?.id}`)}
+                            className="rounded-full"
+                          >
+                            编辑大纲
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={
+                              outlineLoadingId !== null || !latestCompletedMaterial
+                            }
+                            onClick={() =>
+                              latestCompletedMaterial
+                                ? void generateOutline(latestCompletedMaterial.id, true)
+                                : undefined
+                            }
+                            className="rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-200/50 hover:from-indigo-600 hover:to-indigo-700"
+                          >
+                            {outlineLoadingId === latestCompletedMaterial?.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="mr-2 h-4 w-4" />
+                            )}
+                            重新生成大纲
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled={outlineLoadingId !== null || !latestCompletedMaterial}
+                          onClick={() =>
+                            latestCompletedMaterial
+                              ? void generateOutline(latestCompletedMaterial.id)
+                              : undefined
+                          }
+                          className="rounded-full bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-md shadow-cyan-200/50 hover:from-cyan-600 hover:to-cyan-700"
+                        >
+                          {outlineLoadingId === latestCompletedMaterial?.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="mr-2 h-4 w-4" />
+                          )}
+                          生成大纲
+                        </Button>
+                      )}
+                    </div>
+
+                    {!latestCompletedMaterial && (
+                      <p className="mt-3 text-xs text-slate-500">
+                        先上传并完成解析一份资料后，才能生成/重新生成大纲。
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">课程内容</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {!hasOutline
+                            ? "请先生成学习大纲"
+                            : hasCourseContent
+                              ? `已生成 ${activeOutline?.lessonCount} 章`
+                              : "尚未生成课程内容"}
+                        </p>
+                      </div>
+                      {hasCourseContent && (
+                        <Badge className="shrink-0 bg-green-100 text-green-700 hover:bg-green-100">
+                          已生成
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!hasOutline}
+                        onClick={() => (hasOutline ? router.push(`/courses/${activeOutline?.id}`) : undefined)}
+                        className="rounded-full"
+                      >
+                        编辑课程
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={!hasOutline || isGeneratingCourse}
+                        onClick={() => void handleGenerateCourse()}
+                        className="rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-200/50 hover:from-emerald-600 hover:to-emerald-700"
+                      >
+                        {isGeneratingCourse ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-2 h-4 w-4" />
+                        )}
+                        {hasCourseContent ? "重新生成课程" : "生成课程"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="glass">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">

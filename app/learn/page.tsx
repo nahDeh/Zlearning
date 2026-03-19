@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -124,6 +125,7 @@ function LearningRadarChart() {
 }
 
 export default function LearnPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<LearningProject[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, StudyProgress>>({});
   const [loading, setLoading] = useState(true);
@@ -204,6 +206,7 @@ export default function LearnPage() {
   const currentProjectHref = currentProject
     ? getProjectHref(currentProject.id, currentProgress?.currentLessonId ?? null)
     : "/onboarding";
+  const showOverview = false;
 
   if (loading) {
     return (
@@ -222,29 +225,32 @@ export default function LearnPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50/30 to-blue-50/20">
-      {/* 顶部状态栏 */}
-      <div className="bg-slate-900 text-white px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg">
-              <Calendar className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm font-medium">连续学习 12 天</span>
+      {/* 顶部状态栏（暂不启用） */}
+      {showOverview && (
+        <div className="bg-slate-900 text-white px-4 py-3">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <Calendar className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-medium">连续学习 12 天</span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <Trophy className="w-4 h-4 text-yellow-400" />
+                <span className="text-sm font-medium">知识等级：Level 4</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg">
-              <Trophy className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm font-medium">知识等级：Level 4</span>
-            </div>
+            <button className="flex items-center gap-2 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
+              <Bell className="w-4 h-4" />
+              <span className="text-sm">通知</span>
+            </button>
           </div>
-          <button className="flex items-center gap-2 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
-            <Bell className="w-4 h-4" />
-            <span className="text-sm">通知</span>
-          </button>
         </div>
-      </div>
+      )}
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* 主内容区域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* 学习概览（暂不启用） */}
+        {showOverview && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* 左侧：当前项目进度 */}
           <Card className="lg:col-span-2 glass rounded-2xl shadow-lg hover:shadow-xl transition-shadow">
             <CardContent className="p-6">
@@ -363,7 +369,8 @@ export default function LearnPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+          </div>
+        )}
 
         {/* 学习项目列表 */}
         {projects.length > 0 && (
@@ -386,7 +393,20 @@ export default function LearnPage() {
               {projects.map((project) => {
                 const progress = progressMap[project.id];
                 return (
-                  <Card key={project.id} className="glass rounded-2xl shadow-lg hover:shadow-xl transition-all card-hover">
+                  <Card
+                    key={project.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`打开项目：${project.title}`}
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(`/projects/${project.id}`);
+                      }
+                    }}
+                    className="glass cursor-pointer rounded-2xl shadow-lg hover:shadow-xl transition-all card-hover"
+                  >
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between mb-4 gap-3">
                         <h3 className="font-semibold text-slate-800 line-clamp-1">{project.title}</h3>
@@ -397,17 +417,20 @@ export default function LearnPage() {
                         >
                           {project.status === "active" ? "进行中" : "已完成"}
                         </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="删除项目"
-                          disabled={deletingProjectId !== null}
-                          onClick={() => void handleDeleteProject(project.id)}
-                          className="h-8 w-8 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-600"
-                        >
-                          {deletingProjectId === project.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="删除项目"
+                            disabled={deletingProjectId !== null}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleDeleteProject(project.id);
+                            }}
+                            className="h-8 w-8 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-600"
+                          >
+                            {deletingProjectId === project.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
                             <Trash2 className="h-4 w-4" />
                           )}
                       </Button>
@@ -437,7 +460,11 @@ export default function LearnPage() {
                         </>
                       )}
 
-                      <Link href={getProjectHref(project.id, progress?.currentLessonId ?? null)} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 rounded-xl block mt-4">
+                      <Link
+                        href={getProjectHref(project.id, progress?.currentLessonId ?? null)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 rounded-xl block mt-4"
+                      >
                         <Button className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 rounded-xl shadow-md shadow-cyan-200/50 transition-all duration-300 hover:shadow-lg">
                           <Play className="w-4 h-4 mr-2" />
                           {progress?.currentLessonId ? "继续学习" : "开始学习"}

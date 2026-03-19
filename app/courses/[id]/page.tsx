@@ -466,11 +466,11 @@ export default function CoursePage({ params }: PageProps) {
                       )}
                     </div>
 
-                    {hasContent && lesson && (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => void handleRegenerateLesson(lesson.id)}
+                      {hasContent && lesson && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => void handleRegenerateLesson(lesson.id)}
                           disabled={
                             regeneratingLessonId !== null ||
                             generating ||
@@ -484,13 +484,21 @@ export default function CoursePage({ params }: PageProps) {
                           ) : (
                             <RotateCcw className="mr-2 h-4 w-4" />
                           )}
-                          重新生成
+                            重新生成
+                          </Button>
+                          <Link
+                            href={`/lessons/${lesson.id}/edit`}
+                            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 rounded-full inline-block"
+                          >
+                            <Button variant="outline" className="rounded-full">
+                              编辑内容
+                            </Button>
+                          </Link>
+                          <Link href={`/lessons/${lesson.id}`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 rounded-full inline-block">
+                         <Button className="rounded-full bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-md shadow-cyan-200/50 hover:from-cyan-600 hover:to-cyan-700">
+                           <BookOpen className="mr-2 h-4 w-4" />
+                           开始学习
                         </Button>
-                        <Link href={`/lessons/${lesson.id}`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 rounded-full inline-block">
-                        <Button className="rounded-full bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-md shadow-cyan-200/50 hover:from-cyan-600 hover:to-cyan-700">
-                          <BookOpen className="mr-2 h-4 w-4" />
-                          开始学习
-                       </Button>
                       </Link>
                       </div>
                     )}

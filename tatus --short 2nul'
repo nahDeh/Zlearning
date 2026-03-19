@@ -1,0 +1,37 @@
+warning: in the working copy of 'app/api/projects/[id]/route.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app/api/projects/[id]/route.ts b/app/api/projects/[id]/route.ts[m
+[1mindex de5c302..a29abd1 100644[m
+[1m--- a/app/api/projects/[id]/route.ts[m
+[1m+++ b/app/api/projects/[id]/route.ts[m
+[36m@@ -61,6 +61,16 @@[m [mexport async function GET([m
+       return NextResponse.json({ error: "项目不存在" }, { status: 404 });[m
+     }[m
+ [m
+[32m+[m[32m    const activeOutline = await prisma.outline.findFirst({[m
+[32m+[m[32m      where: { projectId: id, isActive: true },[m
+[32m+[m[32m      orderBy: { version: "desc" },[m
+[32m+[m[32m      include: {[m
+[32m+[m[32m        _count: {[m
+[32m+[m[32m          select: { lessons: true },[m
+[32m+[m[32m        },[m
+[32m+[m[32m      },[m
+[32m+[m[32m    });[m
+[32m+[m
+     return NextResponse.json({[m
+       success: true,[m
+       project: {[m
+[36m@@ -73,6 +83,14 @@[m [mexport async function GET([m
+                 : null,[m
+             }[m
+           : null,[m
+[32m+[m[32m        activeOutline: activeOutline[m
+[32m+[m[32m          ? {[m
+[32m+[m[32m              id: activeOutline.id,[m
+[32m+[m[32m              version: activeOutline.version,[m
+[32m+[m[32m              createdAt: activeOutline.createdAt,[m
+[32m+[m[32m              lessonCount: activeOutline._count.lessons,[m
+[32m+[m[32m            }[m
+[32m+[m[32m          : null,[m
+       },[m
+     });[m
+   } catch (error) {[m

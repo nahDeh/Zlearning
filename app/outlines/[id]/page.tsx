@@ -173,20 +173,6 @@ export default function OutlinePage() {
               </div>
               <p className="font-medium text-slate-600">加载中...</p>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="删除大纲"
-              disabled={isDeleting || isSaving || isConfirming}
-              onClick={handleDeleteOutline}
-              className="rounded-full border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"
-            >
-              {isDeleting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-            </Button>
           </div>
         </div>
       </div>
@@ -247,6 +233,20 @@ export default function OutlinePage() {
               <div className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-500">
                 版本 {outline.version}
               </div>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="删除大纲"
+                disabled={isDeleting || isSaving || isConfirming}
+                onClick={handleDeleteOutline}
+                className="rounded-full border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
             </div>
           </div>
         </div>

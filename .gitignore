@@ -56,3 +56,4 @@ uploads/
 
 # OS
 *.log
+eslint-report.json
